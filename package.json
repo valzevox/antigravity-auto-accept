@@ -1,0 +1,158 @@
+{
+  "name": "antigravity-auto-accept",
+  "displayName": "Antigravity Auto Accept",
+  "description": "Auto-accept Antigravity 2.0 multi-choice prompts, terminal run approvals, and agent actions hands-free via CDP.",
+  "version": "2.0.0",
+  "author": "valzevox <valzevox@gmail.com>",
+  "publisher": "valzevox",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/valzevox/antigravity-auto-accept"
+  },
+  "homepage": "https://github.com/valzevox/antigravity-auto-accept#readme",
+  "bugs": {
+    "url": "https://github.com/valzevox/antigravity-auto-accept/issues"
+  },
+  "categories": [
+    "Machine Learning",
+    "Other"
+  ],
+  "keywords": [
+    "antigravity",
+    "cursor",
+    "vscode",
+    "ai",
+    "auto-accept",
+    "copilot",
+    "agent",
+    "approval",
+    "approvals",
+    "prompt",
+    "terminal",
+    "automation",
+    "cdp",
+    "devtools"
+  ],
+  "scripts": {
+    "compile": "esbuild extension.js --bundle --outfile=dist/extension.js --external:vscode --platform=node --format=cjs",
+    "vscode:prepublish": "npm run compile",
+    "package": "npx vsce package",
+    "build:vsix": "npm run compile && npm run package",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "extensionKind": [
+    "ui"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "auto-accept-free.toggle",
+        "title": "Antigravity Auto Accept: Toggle ON/OFF"
+      },
+      {
+        "command": "auto-accept-free.toggleBackground",
+        "title": "Antigravity Auto Accept: Toggle Background Mode"
+      },
+      {
+        "command": "auto-accept-free.setupCDP",
+        "title": "Antigravity Auto Accept: Save IDE Launcher"
+      },
+      {
+        "command": "auto-accept-free.openControlPanel",
+        "title": "Antigravity Auto Accept: Open Control Panel"
+      },
+      {
+        "command": "auto-accept-free.copyDiagnostics",
+        "title": "Antigravity Auto Accept: Copy Diagnostics"
+      },
+      {
+        "command": "auto-accept-free.copySupportBundle",
+        "title": "Antigravity Auto Accept: Copy Full Support Bundle"
+      },
+      {
+        "command": "auto-accept-free.openOutputLog",
+        "title": "Antigravity Auto Accept: Open Output Log"
+      },
+      {
+        "command": "auto-accept-free.copyLauncherSteps",
+        "title": "Antigravity Auto Accept: Copy Launcher Steps"
+      },
+      {
+        "command": "auto-accept-free.copyManualLaunchCommand",
+        "title": "Antigravity Auto Accept: Copy Manual Launch Command"
+      }
+    ],
+    "configuration": {
+      "title": "Antigravity Auto Accept",
+      "properties": {
+        "autoAcceptFree.cdpPort": {
+          "type": "number",
+          "default": 9000,
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "CDP port expected by Auto Accept and used when generating launcher files"
+        },
+        "autoAcceptFree.pauseOnCdpMismatch": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a warning and pause action flow when configured CDP port is not active"
+        },
+        "autoAcceptFree.antigravityExecutablePath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional absolute path to the Antigravity executable or app bundle when it is not installed in a default location"
+        },
+        "autoAcceptFree.cursorExecutablePath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional absolute path to the Cursor executable or app bundle when it is not installed in a default location"
+        },
+        "autoAcceptFree.pollInterval": {
+          "type": "number",
+          "default": 500,
+          "description": "Polling interval in milliseconds (lower is faster)"
+        },
+        "autoAcceptFree.bannedCommands": {
+          "type": "array",
+          "default": [
+            "rm -rf /",
+            "rm -rf ~",
+            "rm -rf *",
+            "format c:",
+            "del /f /s /q",
+            "rmdir /s /q",
+            ":(){:|:&};:",
+            "dd if=",
+            "mkfs.",
+            "> /dev/sda",
+            "chmod -R 777 /"
+          ],
+          "description": "Dangerous command patterns blocked automatically"
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "ws": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.75.0",
+    "@vitest/coverage-v8": "^2.1.8",
+    "esbuild": "^0.19.0",
+    "jsdom": "^25.0.1",
+    "playwright": "^1.58.2",
+    "vitest": "^2.1.8",
+    "vsce": "^2.15.0"
+  }
+}

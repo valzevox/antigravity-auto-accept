@@ -1,0 +1,12 @@
+node_modules/
+dist/
+out/
+*.vsix
+*.zip
+*.log
+daemon.log
+.DS_Store
+Thumbs.db
+.vscode-test/
+coverage/
+.agent/
