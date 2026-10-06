@@ -176,6 +176,21 @@ Feel free to check the [Issues page](https://github.com/valzevox/antigravity-aut
 
 ---
 
+## 💖 Support & Donate
+
+If **Antigravity Auto Accept** saved your time and made your workflow seamless, consider buying me a coffee or supporting my work:
+
+<p align="left">
+  <a href="https://ko-fi.com/m1n698"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support on Ko-fi" /></a>
+  &nbsp;&nbsp;
+  <a href="https://zypage.com/m1n6"><img src="https://img.shields.io/badge/Donate-ZyPage-blueviolet?style=for-the-badge&logo=heart" alt="Donate on ZyPage" /></a>
+</p>
+
+- **Ko-fi:** [ko-fi.com/m1n698](https://ko-fi.com/m1n698)
+- **ZyPage:** [zypage.com/m1n6](https://zypage.com/m1n6)
+
+---
+
 ## 👤 Author
 
 **valzevox**
