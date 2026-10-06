@@ -79,51 +79,64 @@ When building large software or letting AI agents complete autonomous multi-step
 
 ---
 
-### Step 1: Clone & Install Dependencies
+### Step 1: Clone the repository
 
 ```bash
 git clone https://github.com/valzevox/antigravity-auto-accept.git
 cd antigravity-auto-accept
-npm install
 ```
 
 ---
 
-### Step 2: Configure Antigravity Debugging Port
+### Step 2: Run the 1-Click Setup
 
-Antigravity must be started with remote debugging enabled (`--remote-debugging-port=9000`).
+Double-click **`setup.bat`** (or right-click &gt; *Run as Administrator*).
 
-#### 🪟 Windows (Automated Shortcut Setup):
-Run the provided PowerShell setup script to automatically configure all your Desktop and Start Menu Antigravity shortcuts:
+The setup script automatically handles everything:
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\update-shortcuts.ps1
-```
-
-*(Or simply launch Antigravity from terminal with: `Antigravity.exe --remote-debugging-port=9000`)*
+1. ✅ Verifies Node.js is installed
+2. ✅ Installs npm dependencies
+3. ✅ Patches all Antigravity Desktop &amp; Start Menu shortcuts with `--remote-debugging-port=9000`
+4. ✅ Registers a Windows Scheduled Task so the daemon auto-starts on login
+5. ✅ Launches the background daemon immediately
 
 ---
 
-### Step 3: Start the Daemon
+### Step 3: Restart Antigravity
 
-#### Run in Foreground:
+Close Antigravity and reopen it using your (now-patched) shortcut. The auto-accept engine is now fully active.
+
+---
+
+### Manual Alternative (Advanced Users)
+
 ```bash
-node daemon.js
-```
+# Install dependencies
+npm install
 
-#### Run Permanently in Background (Windows Scheduled Task):
-To have the daemon run silently on Windows startup without opening any console windows:
+# Patch Antigravity shortcuts
+powershell -ExecutionPolicy Bypass -File scripts\update-shortcuts.ps1
 
-```cmd
-schtasks /create /tn "AntigravityAutoAccept" /tr "C:\Users\%USERNAME%\.gemini\antigravity-auto-accept\run-daemon.cmd" /sc onlogon /f
-schtasks /run /tn "AntigravityAutoAccept"
+# Start the background daemon
+run.bat
 ```
 
 ---
 
-## 🔍 Diagnostics & Health Check
+## 📋 Command Reference
 
-Check the live status of the auto-accept engine at any time:
+| Command | Description |
+| :--- | :--- |
+| `setup.bat` | Full 1-click setup: install, patch shortcuts, register startup, run daemon |
+| `run.bat` | Start or restart the background daemon |
+| `status.bat` | Check if the daemon is running and CDP is connected |
+| `node daemon.js` | Run daemon in foreground (for debugging) |
+
+---
+
+## 🔍 Diagnostics &amp; Health Check
+
+Check the live status of the auto-accept engine at any time by double-clicking **`status.bat`**:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File status.ps1
