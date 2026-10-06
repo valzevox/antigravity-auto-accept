@@ -49,6 +49,9 @@ function checkCdpPort(port) {
     });
 }
 
+const { MultiSessionRouter } = require('./main_scripts/multi-session');
+const router = new MultiSessionRouter(handler, { log });
+
 async function loop() {
     try {
         const available = await checkCdpPort(PORT);
@@ -63,11 +66,13 @@ async function loop() {
             if (!isConnected) {
                 log('[AutoAccept Daemon] Successfully connected to Antigravity 2.0 via CDP!');
                 isConnected = true;
+                router.start();
             }
         } else {
             if (isConnected) {
                 log('[AutoAccept Daemon] Antigravity disconnected or closed. Waiting for Antigravity...');
                 isConnected = false;
+                router.stop();
                 await handler.stop();
             }
         }
