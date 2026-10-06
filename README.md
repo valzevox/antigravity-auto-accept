@@ -34,6 +34,7 @@ When building large software or letting AI agents complete autonomous multi-step
 ## ✨ Key Features
 
 - 🎯 **Native Antigravity 2.0 Multi-Choice Support**: Intelligently handles the 5-choice permission modals, automatically selects *"Yes, and always allow in this conversation/project"*, and triggers the `Submit` button.
+- 🔀 **Multi-Session Auto-Router & Seamless Background Hop**: Monitors all background conversations across your entire workspace/brain. When an agent in another session halts on a tool or permission request, the router automatically hops to that conversation, approves it, and immediately returns you back to your current active session!
 - 🚀 **100% Standalone Background Daemon**: Runs silently in the background as a lightweight system service or background process without needing VS Code workbench windows.
 - 🛡️ **Dangerous Command Guard**: Built-in safety filter automatically blocks hazardous patterns (`rm -rf /`, `format c:`, `dd if=`, etc.).
 - 🔄 **Auto-Reconnection**: Resilient WebSocket layer detects when Antigravity opens or closes, instantly reconnecting within 3 seconds.
@@ -58,13 +59,13 @@ When building large software or letting AI agents complete autonomous multi-step
 |   +-----------------------+           +-----------------------+   |
 |   |   CDP Target Hunter   |  ------>  |  Script DOM Injector  |   |
 |   +-----------------------+           +-----------+-----------+   |
-|                                                   |               |
-|                                                   v               |
-|                                     +-------------------------+   |
-|                                     |    auto-accept.js DOM   |   |
-|                                     |  - Select Permission    |   |
-|                                     |  - Click Submit         |   |
-|                                     |  - Auto-Resume Agent    |   |
+|               |                                   |               |
+|               v                                   v               |
+|   +-----------------------+         +-------------------------+   |
+|   |  MultiSessionRouter   |         |    auto-accept.js DOM   |   |
+|   |  - Disk Brain Watcher |         |  - Select Permission    |   |
+|   |  - Auto-Hop & Return  | <=====> |  - Click Submit         |   |
+|   +-----------------------+         |  - Auto-Resume Agent    |   |
 |                                     +-------------------------+   |
 +-------------------------------------------------------------------+
 ```
@@ -131,6 +132,7 @@ run.bat
 | `run.bat` | Start or restart the background daemon |
 | `status.bat` | Check if the daemon is running and CDP is connected |
 | `node daemon.js` | Run daemon in foreground (for debugging) |
+| `node test-multi-session.js` | Run self-test for Multi-Session Auto-Router detection |
 
 ---
 
