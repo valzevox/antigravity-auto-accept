@@ -15,43 +15,50 @@ const http = require('http');
 const url = require('url');
 const fs = require('fs');
 const path = require('path');
+const { I18nManager } = require('./i18n');
 
-const BRAND = {
-    name: 'Antigravity',
-    avatar: 'https://cdn.discordapp.com/embed/avatars/0.png',
-    footer: 'Antigravity 2.0 • Auto Accept'
-};
+function getBrand() {
+    const t = I18nManager.t();
+    return {
+        name: t.brandName,
+        avatar: 'https://raw.githubusercontent.com/valzevox/antigravity-auto-accept/main/media/icon.png',
+        footer: t.brandFooter
+    };
+}
 
-const EVENT_META = {
-    1: {
-        key: 'manual_intervention',
-        title: 'Manual Intervention Required',
-        color: 0xF59E0B,
-        icon: '✋',
-        label: 'Agent needs your decision'
-    },
-    2: {
-        key: 'task_completed',
-        title: 'Task Completed',
-        color: 0x10B981,
-        icon: '✅',
-        label: 'Agent finished its turn'
-    },
-    3: {
-        key: 'auto_approved',
-        title: 'Auto-Approved',
-        color: 0x3B82F6,
-        icon: '⚡',
-        label: 'Permission granted automatically'
-    },
-    4: {
-        key: 'error',
-        title: 'Execution Error',
-        color: 0xEF4444,
-        icon: '❌',
-        label: 'Agent run failed'
-    }
-};
+function getEventMeta() {
+    const t = I18nManager.t();
+    return {
+        1: {
+            key: 'manual_intervention',
+            title: t.events[1].title,
+            color: 0xF59E0B,
+            icon: '✋',
+            label: t.events[1].label
+        },
+        2: {
+            key: 'task_completed',
+            title: t.events[2].title,
+            color: 0x10B981,
+            icon: '✅',
+            label: t.events[2].label
+        },
+        3: {
+            key: 'auto_approved',
+            title: t.events[3].title,
+            color: 0x3B82F6,
+            icon: '⚡',
+            label: t.events[3].label
+        },
+        4: {
+            key: 'error',
+            title: t.events[4].title,
+            color: 0xEF4444,
+            icon: '⚠️',
+            label: t.events[4].label
+        }
+    };
+}
 
 class Notifier {
     constructor(config = {}) {
@@ -165,24 +172,37 @@ class Notifier {
      * @param {object} payload { session, summary, details, options: string[] }
      */
     buildMessage(code, payload = {}) {
-        const meta = EVENT_META[code] || EVENT_META[1];
+        const t = I18nManager.t();
+        const brand = getBrand();
+        const events = getEventMeta();
+
+        let meta = events[code] || events[1];
+        if (code === 4 && payload.isQuota) {
+            meta = {
+                key: 'quota_error',
+                title: t.events.quota.title,
+                color: 0xED4245,
+                icon: '⚠️',
+                label: t.events.quota.label
+            };
+        }
         const { session = 'unknown', summary = '', details = '', options = [] } = payload;
-        const stamp = new Date().toISOString().replace('T', ' ').replace(/\..+/, ' UTC');
+        const stamp = new Date().toLocaleString(I18nManager.getLanguage() === 'vi' ? 'vi-VN' : 'en-US');
         const short = session.length > 14 ? `${session.slice(0, 10)}…` : session;
 
         const fields = [
-            { name: 'Session', value: `\`${session}\``, inline: true },
-            { name: 'Time', value: stamp, inline: true }
+            { name: t.fields.session, value: `\`${session}\``, inline: true },
+            { name: t.fields.time, value: stamp, inline: true }
         ];
         if (details) {
             fields.push({
-                name: 'Prompt',
+                name: t.fields.prompt,
                 value: details.length > 1000 ? `${details.slice(0, 997)}…` : details
             });
         }
         if (options.length) {
             fields.push({
-                name: 'Options',
+                name: t.fields.options,
                 value: options.slice(0, 10).map((o, i) => `**${i + 1}.** ${Notifier.shortLabel(o, 90)}`).join('\n')
             });
         }
@@ -193,20 +213,20 @@ class Notifier {
         return {
             meta,
             embed: {
-                author: { name: BRAND.name, icon_url: BRAND.avatar },
+                author: { name: brand.name, icon_url: brand.avatar },
                 title: `${meta.icon} ${meta.title}`,
                 description: (summary || meta.label).slice(0, 4000),
                 color: meta.color,
                 fields,
-                footer: { text: BRAND.footer },
+                footer: { text: brand.footer },
                 timestamp: new Date().toISOString()
             },
             telegramText:
                 `<b>${meta.icon} ${meta.title}</b>\n\n` +
                 `${tgSafeSummary}\n\n` +
-                `<b>Session:</b> <code>${short}</code>\n` +
-                `<b>Time:</b> ${stamp}` +
-                (details ? `\n\n<b>Prompt:</b>\n${Notifier.escapeHtml(details).slice(0, 800)}` : '') +
+                `<b>${t.fields.session}:</b> <code>${short}</code>\n` +
+                `<b>${t.fields.time}:</b> ${stamp}` +
+                (details ? `\n\n<b>${t.fields.prompt}:</b>\n${Notifier.escapeHtml(details).slice(0, 800)}` : '') +
                 (options.length ? `\n\n${options.slice(0, 10).map((o, i) => `<b>${i + 1}.</b> ${Notifier.escapeHtml(Notifier.shortLabel(o, 200))}`).join('\n')}` : ''),
             // Interactive buttons only exist for manual intervention.
             replyMarkup: code === 1 && options.length
@@ -230,9 +250,9 @@ class Notifier {
 
         const jobs = [];
 
-        // Format ping text (e.g. @here, @everyone, or <@123456>) on Case 1 (options) and Case 2 (task completed)
+        // Format ping text (e.g. @here, @everyone, or <@123456>) on Case 1 (options), Case 2 (task completed), and Case 4 (error / quota exhausted)
         let mention = '';
-        if ((code === 1 || code === 2) && discordBot.mentionUserId) {
+        if ((code === 1 || code === 2 || code === 4) && discordBot.mentionUserId) {
             const m = String(discordBot.mentionUserId).trim();
             if (m.toLowerCase() === 'here' || m === '@here') mention = '@here';
             else if (m.toLowerCase() === 'everyone' || m === '@everyone') mention = '@everyone';
@@ -246,9 +266,10 @@ class Notifier {
 
         if (discord) {
             const hookMention = mention ? `${mention}\n` : '';
+            const brand = getBrand();
             jobs.push(this.post(discord, {
-                username: BRAND.name,
-                avatar_url: BRAND.avatar,
+                username: brand.name,
+                avatar_url: brand.avatar,
                 content: hookMention || undefined,
                 embeds: [msg.embed]
             }));
@@ -282,4 +303,10 @@ class Notifier {
     }
 }
 
-module.exports = { Notifier, EVENT_META, BRAND };
+module.exports = {
+    Notifier,
+    getBrand,
+    getEventMeta,
+    get BRAND() { return getBrand(); },
+    get EVENT_META() { return getEventMeta(); }
+};

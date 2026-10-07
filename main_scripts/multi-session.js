@@ -25,8 +25,23 @@ const FRESH_MS = 120000;
 const COOLDOWN_MS = 60000;
 const HOP_SETTLE_MS = 800;
 const SETTLE_BACK_MS = 1800;
+const DONE_DEDUP_MS = 600000; // 10 minutes — suppress duplicate completion alerts
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Cheap fingerprint for a completion summary so a hop-back to a finished
+ * session cannot re-fire the same "Task completed" alert.
+ */
+function hashContent(text) {
+    let h = 2166136261;
+    const s = String(text || '');
+    for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+}
 
 // Runs in the page. Returns true when an approval card is on screen.
 const PAGE_HAS_APPROVAL = `(() => {
@@ -60,6 +75,9 @@ class MultiSessionRouter {
         this.busy = false;
         this.cooldowns = new Map();
         this.seenSteps = new Map();
+        this.quotaAlerted = new Map();
+        // Cross-session hop deduplication: sessionId -> { stepId, contentHash, timestamp }
+        this.notifiedDone = new Map();
     }
 
     start() {
@@ -119,9 +137,60 @@ class MultiSessionRouter {
 
             const last = this.tailRecord(file);
             if (!last) continue;
-            if (last.type !== 'PLANNER_RESPONSE' || last.status !== 'DONE') continue;
 
-            const key = `${id}:${last.step_index}`;
+            const stepId = last.step_index !== undefined ? last.step_index : (last.created_at || stat.mtimeMs);
+            const key = `${id}:${stepId}`;
+
+            // Case 0: Agent encountered an Error or Quota Exhaustion!
+            const isErrorMessageType = last.type === 'ERROR_MESSAGE' || last.status === 'ERROR' || Boolean(last.error);
+            const contentText = typeof last.content === 'string' ? last.content : '';
+            const errorText = typeof last.error === 'string' ? last.error : (typeof last.error === 'object' ? JSON.stringify(last.error) : '');
+            const combinedText = `${errorText} ${contentText}`.trim();
+            const lowerCombined = combinedText.toLowerCase();
+
+            // ponytail: quota is only meaningful on an error record; a normal reply that
+            // merely mentions "quota" must not raise an alert.
+            const isQuotaExhausted = isErrorMessageType && (
+                                     lowerCombined.includes('resource_exhausted') ||
+                                     lowerCombined.includes('check quota') ||
+                                     lowerCombined.includes('rate limit') ||
+                                     lowerCombined.includes('code 429') ||
+                                     lowerCombined.includes('too many requests') ||
+                                     lowerCombined.includes('out of tokens') ||
+                                     lowerCombined.includes('usage limit') ||
+                                     lowerCombined.includes('insufficient quota') ||
+                                     lowerCombined.includes('capacity reached'));
+
+            const isExecutionError = isErrorMessageType;
+
+            if (isQuotaExhausted || isExecutionError) {
+                // API retries emit one ERROR_MESSAGE per attempt (up to 6). Alert once per session.
+                const lastAlert = this.quotaAlerted.get(id) || 0;
+                if (!this.seenSteps.has(key) && (now - lastAlert) > 60000) {
+                    this.seenSteps.set(key, now);
+                    this.quotaAlerted.set(id, now);
+                    const isQuota = isQuotaExhausted;
+                    const rawErr = (errorText || contentText || '').trim();
+                    const summary = isQuota
+                        ? `**Hết hạn mức dùng token — Antigravity đã dừng giữa chừng.**\n\nTài khoản đã chạm trần giới hạn của nhà cung cấp, tác vụ chưa xong. Hãy kiểm tra lại tài khoản hoặc chờ mức dùng được hồi lại rồi chạy tiếp.`
+                        : `**Tác vụ bị gián đoạn do lỗi.**\n\nAntigravity đã dừng lại, tác vụ chưa hoàn thành.`;
+                    const details = rawErr ? `Chi tiết lỗi từ hệ thống:\n\`\`\`\n${rawErr}\n\`\`\`` : '';
+
+                    this.notifier.notify(4, {
+                        session: id,
+                        summary,
+                        details,
+                        isQuota
+                    });
+
+                    if (this.loadingWatcher) {
+                        this.loadingWatcher.finishSession(id, summary, true);
+                    }
+                }
+                continue;
+            }
+
+            if (last.type !== 'PLANNER_RESPONSE' || last.status !== 'DONE') continue;
 
             // Case 1: Agent asks user a question (manual intervention required)
             if (Array.isArray(last.tool_calls) && last.tool_calls.some(tc => tc.name === 'ask_question')) {
@@ -143,7 +212,7 @@ class MultiSessionRouter {
 
                     this.notifier.notify(1, {
                         session: id,
-                        summary: promptText || 'Agent requires user decision or input.',
+                        summary: promptText || 'Agent đang chờ bạn đưa ra quyết định.',
                         details: promptText,
                         options
                     });
@@ -153,9 +222,22 @@ class MultiSessionRouter {
 
             // Case 2: Agent completed response with no further tool calls
             if (!Array.isArray(last.tool_calls) || last.tool_calls.length === 0) {
-                if (!this.seenSteps.has(key)) {
+                const doneContent = (last.content || '').trim();
+                const doneHash = hashContent(doneContent);
+
+                // Hopping between sessions re-touches the transcript file, so the
+                // step key alone cannot tell a new turn from the one already
+                // reported. Fall back to a content fingerprint + recency window.
+                const prior = this.notifiedDone.get(id);
+                const isRepeat = prior && (
+                    (prior.contentHash === doneHash) ||
+                    (prior.stepId === stepId)
+                ) && (now - prior.timestamp) < DONE_DEDUP_MS;
+
+                if (!this.seenSteps.has(key) && !isRepeat) {
                     this.seenSteps.set(key, now);
-                    let content = (last.content || '').trim();
+                    this.notifiedDone.set(id, { stepId, contentHash: doneHash, timestamp: now });
+                    let content = doneContent;
                     if (!content) {
                         content = 'Agent hoàn tất lượt công việc (Không còn yêu cầu công cụ nào khác).';
                     } else if (content.length > 3000) {
@@ -215,10 +297,10 @@ class MultiSessionRouter {
             this.log(`[MultiSession] Approved pending request in ${sid}`);
             this.notifier.notify(3, {
                 session: sid,
-                summary: `Tự động phê duyệt quyền (Always Allow) thành công cho phiên \`${sid}\``
+                summary: `Tự động phê duyệt quyền thành công cho phiên \`${sid}\``
             });
             if (this.loadingWatcher) {
-                this.loadingWatcher.recordApproval(sid, 'Luôn cho phép (Always Allow)', 'Phê duyệt công cụ/lệnh');
+                this.loadingWatcher.recordApproval(sid, 'Luôn cho phép', 'Cấp quyền công cụ');
             }
             await sleep(SETTLE_BACK_MS);
         }

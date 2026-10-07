@@ -9,6 +9,7 @@ const https = require('https');
 
 const CONFIG_PATH = path.resolve(__dirname, '../config.json');
 const { VoiceHandler } = require('./voice-handler');
+const { I18nManager } = require('./i18n');
 
 class DiscordCommandHandler {
     constructor(gateway, router, log = console.log) {
@@ -158,6 +159,11 @@ class DiscordCommandHandler {
             case 'owner':
                 await this.cmdSetOwner(message, args);
                 break;
+            case 'lang':
+            case 'language':
+            case 'ngonngu':
+                await this.cmdLanguage(message, args[0]);
+                break;
             case 'channels':
             case 'listchannels':
                 await this.cmdListChannels(message);
@@ -252,14 +258,14 @@ class DiscordCommandHandler {
             } else {
                 // Default: Regular prompt into Antigravity
                 const embed = {
-                    title: '🎙️ Voice Transcribed & Sent to Antigravity!',
+                    title: '🎙️ Đã nhận diện giọng nói và nạp vào Antigravity!',
                     description: `**Nội dung nhận diện:**\n> "${transcribed}"`,
                     color: 0x5865F2,
                     fields: [
                         { name: 'Người gửi', value: `<@${message.author.id}>`, inline: true },
-                        { name: 'Model', value: '`whisper-large-v3-turbo`', inline: true }
+                        { name: 'Mô hình chuyển âm', value: '`whisper-large-v3-turbo`', inline: true }
                     ],
-                    footer: { text: 'Antigravity Voice Bridge' }
+                    footer: { text: 'Antigravity • Điều khiển bằng giọng nói' }
                 };
 
                 await this.reply(message.channel_id, '', embed);
@@ -321,23 +327,25 @@ class DiscordCommandHandler {
     }
 
     async cmdHelp(message) {
+        const t = I18nManager.t();
         const embed = {
-            title: '🛠️ Antigravity Discord Control Commands',
-            description: 'Các lệnh quản lý và tương tác 2 chiều với Antigravity:',
+            title: t.commands.helpTitle,
+            description: t.commands.helpDesc,
             color: 0x5865F2,
             fields: [
-                { name: '`!prompt <nội dung>` hoặc `!message <nội dung>`', value: '🚀 **Gửi prompt trực tiếp vào Antigravity** để Agent thực thi!', inline: false },
-                { name: '`!new <nội dung>`', value: '✨ Mở phiên chat mới và gửi prompt thực thi.', inline: false },
-                { name: '`!stop`', value: '🛑 Dừng khẩn cấp task đang chạy trong Antigravity.', inline: false },
-                { name: '`!sessions`', value: '📂 Xem danh sách các phiên trò chuyện & session đang mở.', inline: false },
-                { name: '`!switch <id hoặc tên>`', value: '🔀 Chuyển Antigravity sang session được chỉ định.', inline: false },
-                { name: '`!status`', value: 'Kiểm tra trạng thái CDP, session đang mở & daemon.', inline: false },
-                { name: '`!config`', value: 'Xem cấu hình hiện tại (kênh gửi, chế độ ping).', inline: false },
-                { name: '`!setchannel <#kênh hoặc ID>`', value: 'Đổi kênh bot sẽ gửi thông báo và câu hỏi.', inline: false },
-                { name: '`!setping <@user | here | everyone | off>`', value: 'Cấu hình ai sẽ được ping khi có câu hỏi / hoàn tất task.', inline: false },
-                { name: '`!channels`', value: 'Liệt kê danh sách các kênh trong server kèm ID.', inline: false }
+                { name: '`!prompt <text>` / `!message <text>`', value: t.commands.promptDesc, inline: false },
+                { name: '`!new <text>`', value: t.commands.newDesc, inline: false },
+                { name: '`!stop`', value: t.commands.stopDesc, inline: false },
+                { name: '`!sessions`', value: t.commands.sessionsDesc, inline: false },
+                { name: '`!switch <id>`', value: t.commands.switchDesc, inline: false },
+                { name: '`!status`', value: t.commands.statusDesc, inline: false },
+                { name: '`!config`', value: t.commands.configDesc, inline: false },
+                { name: '`!language`', value: t.commands.setlanguageDesc, inline: false },
+                { name: '`!setchannel <#channel>`', value: t.commands.setchannelDesc, inline: false },
+                { name: '`!setping <target>`', value: t.commands.setpingDesc, inline: false },
+                { name: '`!channels`', value: t.commands.channelsDesc, inline: false }
             ],
-            footer: { text: 'Antigravity 2.0 • Remote 2-Way Controller' }
+            footer: { text: t.twoWayFooter }
         };
         await this.reply(message.channel_id, '', embed);
     }
@@ -429,29 +437,33 @@ class DiscordCommandHandler {
     }
 
     async cmdStatus(message) {
+        const t = I18nManager.t();
         const isConnected = this.router?.cdp?.connected || (this.router?.handler?.connections?.size > 0);
         const info = await this.router.getSessions();
         const activeName = info?.currentTitle || 'N/A';
         const activeId = info?.currentId ? `\`${info.currentId.slice(0, 8)}...\`` : 'N/A';
         const guildId = this.gateway.guildId;
         const channelId = this.gateway.channelId;
+        const currentLang = I18nManager.getLangName(I18nManager.getLanguage());
 
         const embed = {
-            title: '⚡ Antigravity System Status',
+            title: t.commands.statusTitle,
             color: isConnected ? 0x10B981 : 0xEF4444,
             fields: [
-                { name: 'Antigravity CDP', value: isConnected ? '🟢 Connected' : '🔴 Disconnected', inline: true },
-                { name: 'Active Session', value: `**${activeName}**\n(${activeId})`, inline: true },
-                { name: 'Target Channel', value: `<#${channelId}> (\`${channelId}\`)`, inline: false },
-                { name: 'Guild ID', value: `\`${guildId}\``, inline: true }
+                { name: t.commands.connField, value: isConnected ? t.commands.connected : t.commands.disconnected, inline: true },
+                { name: t.commands.activeField, value: `**${activeName}**\n(${activeId})`, inline: true },
+                { name: t.commands.langField, value: currentLang, inline: true },
+                { name: t.commands.targetField, value: `<#${channelId}> (\`${channelId}\`)`, inline: false },
+                { name: t.commands.guildField, value: `\`${guildId}\``, inline: true }
             ],
-            footer: { text: 'Antigravity 2.0 • 2-Way Controller' },
+            footer: { text: t.twoWayFooter },
             timestamp: new Date().toISOString()
         };
         await this.reply(message.channel_id, '', embed);
     }
 
     async cmdConfig(message) {
+        const t = I18nManager.t();
         const cfg = this.loadConfig();
         const bot = cfg.webhooks?.discordBot || {};
         const mention = bot.mentionUserId || '(None)';
@@ -460,17 +472,67 @@ class DiscordCommandHandler {
         else if (mention === 'everyone') pingMode = '@everyone';
         else if (mention) pingMode = `<@${mention}> (\`${mention}\`)`;
 
+        const currentLang = I18nManager.getLangName(I18nManager.getLanguage());
+
         const embed = {
-            title: '⚙️ Antigravity Bot Configuration',
+            title: t.commands.configTitle,
             color: 0x3B82F6,
             fields: [
-                { name: 'Notification Channel', value: `<#${bot.channelId || this.gateway.channelId}>`, inline: true },
-                { name: 'Option Ping Target', value: pingMode, inline: true },
-                { name: 'Guild ID', value: `\`${bot.guildId || this.gateway.guildId}\``, inline: false }
+                { name: t.commands.configChannel, value: `<#${bot.channelId || this.gateway.channelId}>`, inline: true },
+                { name: t.commands.configPing, value: pingMode, inline: true },
+                { name: t.commands.configLang, value: currentLang, inline: true },
+                { name: t.commands.guildField, value: `\`${bot.guildId || this.gateway.guildId}\``, inline: false }
             ],
-            footer: { text: 'Dùng !setchannel hoặc !setping để thay đổi' }
+            footer: { text: t.commands.configFooter }
         };
         await this.reply(message.channel_id, '', embed);
+    }
+
+    async cmdLanguage(message, langChoice) {
+        if (langChoice) {
+            const chosen = I18nManager.setLanguage(langChoice.toLowerCase());
+            const msg = chosen === 'en'
+                ? '✅ Display language switched to **English**!'
+                : '✅ Đã chuyển ngôn ngữ hiển thị sang **Tiếng Việt**!';
+            return this.reply(message.channel_id, msg);
+        }
+
+        const t = I18nManager.t();
+        const embed = {
+            title: t.commands.langPromptTitle,
+            description: t.commands.langPromptDesc,
+            color: 0x5865F2,
+            fields: [
+                { name: '🇻🇳 Tiếng Việt', value: 'Bấm nút bên dưới để chọn Tiếng Việt.', inline: true },
+                { name: '🇬🇧 English', value: 'Click button below to select English.', inline: true }
+            ],
+            footer: { text: 'Antigravity • Language Selector' }
+        };
+
+        const payload = {
+            embeds: [embed],
+            components: [
+                {
+                    type: 1, // ActionRow
+                    components: [
+                        {
+                            type: 2, // Button
+                            style: 1, // Primary (Blurple)
+                            label: '🇻🇳 Tiếng Việt',
+                            custom_id: 'lang:vi'
+                        },
+                        {
+                            type: 2, // Button
+                            style: 2, // Secondary (Gray)
+                            label: '🇬🇧 English',
+                            custom_id: 'lang:en'
+                        }
+                    ]
+                }
+            ]
+        };
+
+        await this.gateway.createRawMessage(message.channel_id, payload);
     }
 
     async cmdSetChannel(message, args) {

@@ -101,7 +101,7 @@ class TelegramAnswerBridge {
         const index = parseInt(rawIdx, 10);
 
         this.log(`[Bridge] User picked answer ${index + 1} for ${sessionId}`);
-        await this.answerCallback(cb.id, `Selected option ${index + 1}. Applying...`);
+        await this.answerCallback(cb.id, `Đã chọn lựa chọn ${index + 1}. Đang áp dụng...`);
 
         // Use router to evaluate click on the page
         const expr = `(async () => {

@@ -1,4 +1,5 @@
 {
+  "language": "vi",
   "webhooks": {
     "discord": "https://discord.com/api/webhooks/YOUR_WEBHOOK_URL",
     "discordBot": {

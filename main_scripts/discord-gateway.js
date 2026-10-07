@@ -129,6 +129,27 @@ class DiscordGatewayBridge {
         if (interaction.type !== 3) return;
 
         const customId = interaction.data?.custom_id || '';
+
+        // Handle language switch button: lang:en or lang:vi
+        if (customId.startsWith('lang:')) {
+            const targetLang = customId.replace('lang:', '');
+            const { I18nManager } = require('./i18n');
+            I18nManager.setLanguage(targetLang);
+            const user = interaction.member?.user?.username || interaction.user?.username || 'User';
+            const msg = targetLang === 'en'
+                ? `✅ Display language set to **English** by @${user}!`
+                : `✅ Đã chuyển ngôn ngữ hiển thị sang **Tiếng Việt** bởi @${user}!`;
+
+            await this.respondInteraction(interaction.id, interaction.token, {
+                type: 7,
+                data: {
+                    content: msg,
+                    components: []
+                }
+            });
+            return;
+        }
+
         const match = customId.match(/^ans:([a-zA-Z0-9_-]+):(\d+)$/);
         if (!match) return;
 
@@ -138,11 +159,15 @@ class DiscordGatewayBridge {
 
         this.log(`[DiscordGateway] ${user} clicked option ${index + 1} for session ${sessionId}`);
 
+        const { I18nManager } = require('./i18n');
+        const t = I18nManager.t();
+        const ackContent = t.commands.buttonSelected(user, index + 1);
+
         // Acknowledge interaction immediately with UPDATE_MESSAGE (type 7) to show selected state
         await this.respondInteraction(interaction.id, interaction.token, {
             type: 7, // UPDATE_MESSAGE
             data: {
-                content: `✅ **Option ${index + 1} selected by @${user}!** Applying in Antigravity...`,
+                content: ackContent,
                 components: [] // remove buttons after click
             }
         });

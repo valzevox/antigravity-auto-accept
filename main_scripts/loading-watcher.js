@@ -11,6 +11,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { I18nManager } = require('./i18n');
 
 const PROGRESS_FRAMES = [
     '▰▱▱▱▱▱▱▱',
@@ -35,6 +36,9 @@ class LoadingWatcher {
         // Active monitored sessions: sessionId -> state
         this.activeSessions = new Map();
         
+        // Anti-spam deduplication: Map of sessionId -> lastFinishedStepIndex
+        this.finishedSteps = new Map();
+
         // Recent auto-approvals log across all sessions (max 5)
         this.recentAccepts = [];
         
@@ -82,6 +86,10 @@ class LoadingWatcher {
             return current;
         }
 
+        // A new card for this session means a genuinely new turn, so drop the old
+        // dedup marker from the previous turn.
+        this.finishedSteps.delete(sessionId);
+
         const state = {
             sessionId,
             sessionTitle: sessionTitle || `Session ${sessionId.slice(0, 8)}`,
@@ -115,21 +123,36 @@ class LoadingWatcher {
      */
     async finishSession(sessionId, summary = '', isError = false) {
         const state = this.activeSessions.get(sessionId);
-        if (!state) return;
+        if (!state) {
+            // Already finished (duplicate call from a second detection path): remember the
+            // step so no new card can be created for the same finished turn.
+            this.finishedSteps.set(sessionId, this.finishedSteps.get(sessionId) ?? 0);
+            return;
+        }
 
-        state.isCompleted = true;
+        // Remember the finished step BEFORE dropping the session, otherwise the next
+        // 2.5s tick picks the same transcript off disk and re-creates a duplicate card.
+        const live = this.readLiveTranscript(sessionId);
+        const step = live?.lastStepIndex || state.lastStepIndex || 0;
+        this.finishedSteps.set(sessionId, step);
         const gateway = this.router.notifier?.gateway;
         if (gateway && state.messageId && state.channelId) {
+            const t = I18nManager.t();
+            const w = t.watcher;
             const elapsed = Math.round((Date.now() - state.startTime) / 1000);
+            const isQuota = isError && /quota|rate limit|resource_exhausted|429|token/i.test(summary);
+            const title = isError
+                ? (isQuota ? w.finishQuotaTitle : w.finishErrorTitle)
+                : w.finishSuccessTitle;
             const embed = {
-                title: isError ? '❌ Tác vụ thất bại / Bị dừng' : '✅ Tác vụ hoàn tất thành công!',
-                description: summary ? `**Kết quả tóm tắt:**\n${summary.slice(0, 1500)}` : 'Agent đã hoàn tất lượt xử lý.',
+                title,
+                description: summary ? `**${t.fields.prompt}:**\n${summary.slice(0, 1500)}` : (isError ? w.finishDescError : w.finishDescSuccess),
                 color: isError ? 0xED4245 : 0x57F287,
                 fields: [
-                    { name: '📂 Phiên', value: `\`${state.sessionId.slice(0, 8)}\` (${state.sessionTitle})`, inline: true },
-                    { name: '⏱️ Tổng thời gian', value: `${elapsed} giây`, inline: true }
+                    { name: w.sessionField, value: `\`${state.sessionId.slice(0, 8)}\` (${state.sessionTitle})`, inline: true },
+                    { name: w.elapsedField, value: `${elapsed} ${w.seconds}`, inline: true }
                 ],
-                footer: { text: `Antigravity • ${new Date().toLocaleTimeString('vi-VN')}` }
+                footer: { text: `Antigravity • ${new Date().toLocaleTimeString(I18nManager.getLanguage() === 'vi' ? 'vi-VN' : 'en-US')}` }
             };
 
             try {
@@ -142,6 +165,7 @@ class LoadingWatcher {
 
     /**
      * Find most recently active session on disk if CDP is not focused on it
+     * Skips sessions that are already completed (last record is PLANNER_RESPONSE with status DONE)
      */
     findRecentlyActiveSession() {
         try {
@@ -155,7 +179,16 @@ class LoadingWatcher {
                 if (!fs.existsSync(file)) continue;
                 try {
                     const mtime = fs.statSync(file).mtimeMs;
-                    if (now - mtime < 15000 && mtime > latestMtime) {
+                    if (now - mtime >= 15000) continue;
+
+                    // Check if session is actually still generating - read last record
+                    const lastRecord = this.getLastRecord(file);
+                    if (lastRecord && lastRecord.type === 'PLANNER_RESPONSE' && lastRecord.status === 'DONE') {
+                        // Session is completed, not active - skip it
+                        continue;
+                    }
+
+                    if (mtime > latestMtime) {
                         latestMtime = mtime;
                         latest = { id, mtimeMs: mtime };
                     }
@@ -164,6 +197,30 @@ class LoadingWatcher {
             return latest;
         } catch (e) {
             return null;
+        }
+    }
+
+    /**
+     * Get the last valid record from transcript file
+     */
+    getLastRecord(file) {
+        let fd;
+        try {
+            const size = fs.statSync(file).size;
+            if (size === 0) return null;
+            const length = Math.min(size, 8 * 1024); // read last 8KB for quick check
+            const buf = Buffer.alloc(length);
+            fd = fs.openSync(file, 'r');
+            fs.readSync(fd, buf, 0, length, size - length);
+            const lines = buf.toString('utf8').split('\n').filter(l => l.trim());
+            if (!lines.length) return null;
+            return JSON.parse(lines[lines.length - 1]);
+        } catch (e) {
+            return null;
+        } finally {
+            if (fd !== undefined) {
+                try { fs.closeSync(fd); } catch (e) {}
+            }
         }
     }
 
@@ -193,12 +250,20 @@ class LoadingWatcher {
         let activeSubagents = [];
         let lastStepIndex = 0;
         let lastResponseText = '';
+        let lastError = null;
 
         for (let i = lines.length - 1; i >= 0; i--) {
             try {
                 const record = JSON.parse(lines[i]);
                 if (!lastStepIndex && record.step_index) {
                     lastStepIndex = record.step_index;
+                }
+
+                // Check error or quota failure
+                if (!lastError && (record.type === 'ERROR_MESSAGE' || record.status === 'ERROR' || record.error)) {
+                    const errStr = typeof record.error === 'string' ? record.error : (typeof record.error === 'object' ? JSON.stringify(record.error) : '');
+                    const contentStr = typeof record.content === 'string' ? record.content : '';
+                    lastError = (errStr || contentStr).trim();
                 }
 
                 // Check final/recent text content
@@ -245,7 +310,8 @@ class LoadingWatcher {
             currentAction: currentAction || 'Đang thực thi tác vụ...',
             subagents: activeSubagents,
             lastStepIndex,
-            lastResponseText
+            lastResponseText,
+            lastError
         };
     }
 
@@ -253,41 +319,43 @@ class LoadingWatcher {
      * Build Discord Embed for live loading state
      */
     buildLoadingEmbed(state) {
+        const t = I18nManager.t();
+        const w = t.watcher;
         const frame = PROGRESS_FRAMES[this.frameIndex % PROGRESS_FRAMES.length];
         const elapsed = Math.round((Date.now() - state.startTime) / 1000);
 
         const subagentText = state.subagents && state.subagents.length > 0
-            ? `🟢 **${state.subagents.length} sub-agent đang hoạt động:**\n> ${state.subagents.map(s => `• ${s}`).join('\n> ')}`
-            : '⚪ *Không có sub-agent nào độc lập (Agent chính xử lý trực tiếp)*';
+            ? `🟢 **${state.subagents.length} ${w.subagentActive}**\n> ${state.subagents.map(s => `• ${s}`).join('\n> ')}`
+            : `⚪ *${w.subagentNone}*`;
 
         const acceptsText = this.recentAccepts && this.recentAccepts.length > 0
-            ? this.recentAccepts.slice(0, 3).map(a => `> ✅ \`[${a.time}]\` Duyệt: **${a.action}** ${a.details ? `(${a.details})` : ''}`).join('\n')
-            : '⚪ *Chưa có hành động cần cấp quyền gần đây*';
+            ? this.recentAccepts.slice(0, 3).map(a => `> ✅ \`[${a.time}]\` ${a.action} ${a.details ? `(${a.details})` : ''}`).join('\n')
+            : `⚪ *${w.acceptsNone}*`;
 
         return {
-            title: `🔄 Antigravity Đang Xử Lý: ${state.sessionTitle}`,
-            description: `\`${frame}\` **Đang hoạt động (${elapsed}s)**`,
+            title: `${w.runningTitle}: ${state.sessionTitle}`,
+            description: `\`${frame}\` **${w.activeStatus} (${elapsed}s)**`,
             color: 0x5865F2,
             fields: [
                 {
-                    name: '🧠 Luồng suy nghĩ (Thinking)',
-                    value: `> "${(state.lastThought || 'Đang suy nghĩ...').slice(0, 250)}"`
+                    name: w.thinkingField,
+                    value: `> "${(state.lastThought || '...').slice(0, 250)}"`
                 },
                 {
-                    name: '⚙️ Hành động hiện tại',
-                    value: `\`${(state.currentAction || 'Đang thực thi...').slice(0, 100)}\``
+                    name: w.actionField,
+                    value: `\`${(state.currentAction || '...').slice(0, 100)}\``
                 },
                 {
-                    name: '👥 Tiến trình Sub-agents',
+                    name: w.subagentField,
                     value: subagentText
                 },
                 {
-                    name: '⚡ Tự động phê duyệt gần đây (Auto-Accept)',
+                    name: w.acceptsField,
                     value: acceptsText
                 }
             ],
             footer: {
-                text: `Phiên ID: ${state.sessionId.slice(0, 8)} • Cập nhật trực tiếp mỗi 2.5s`
+                text: `${t.fields.session}: ${state.sessionId.slice(0, 8)} • ${w.footerText}`
             },
             timestamp: new Date().toISOString()
         };
@@ -381,6 +449,19 @@ class LoadingWatcher {
                 }
             }
 
+            // Anti-spam: skip if session already finished (dedup via finishedSteps)
+            if (this.finishedSteps.has(sessionId) && this.finishedSteps.get(sessionId) === live.lastStepIndex) {
+                if (state.messageId && state.channelId) {
+                    const embed = this.buildLoadingEmbed(state);
+                    try {
+                        await gateway.editMessage(state.channelId, state.messageId, { embeds: [embed] });
+                    } catch (e) {
+                        this.log(`[LoadingWatcher] Failed to edit message: ${e.message}`);
+                    }
+                }
+                continue;
+            }
+
             if (!stillGenerating) {
                 const transFile = path.join(this.brainDir, sessionId, '.system_generated', 'logs', 'transcript.jsonl');
                 if (fs.existsSync(transFile)) {
@@ -393,10 +474,28 @@ class LoadingWatcher {
                 }
             }
 
-            // Turn completed: auto-finish session card
+            // Turn completed or aborted: auto-finish session card
             if (!stillGenerating && (Date.now() - state.startTime > 3000)) {
-                const summary = live?.lastResponseText || '';
-                await this.finishSession(sessionId, summary, false);
+                const hasError = Boolean(live?.lastError);
+                const rawErr = (live?.lastError || '').toLowerCase();
+                const isQuota = hasError && (
+                    rawErr.includes('resource_exhausted') ||
+                    rawErr.includes('quota') ||
+                    rawErr.includes('rate limit') ||
+                    rawErr.includes('429') ||
+                    rawErr.includes('too many requests') ||
+                    rawErr.includes('out of tokens') ||
+                    rawErr.includes('usage limit')
+                );
+
+                let summary = live?.lastResponseText || '';
+                if (hasError) {
+                    summary = isQuota
+                        ? `Antigravity đã dừng do hết quota / đạt giới hạn token API:\n\`${live.lastError}\`\n\n*Vui lòng kiểm tra lại tài khoản hoặc đợi hồi quota.*`
+                        : `Antigravity gặp lỗi thực thi và đã dừng lại:\n\`${live.lastError}\``;
+                }
+
+                await this.finishSession(sessionId, summary, hasError);
                 continue;
             }
 

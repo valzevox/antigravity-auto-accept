@@ -1,52 +1,56 @@
-# Antigravity Auto Accept ⚡
+# Antigravity Tự Động Phê Duyệt ⚡
 
 <p align="center">
-  <img src="media/icon.png" width="128" height="128" alt="Antigravity Auto Accept Logo" />
+  <img src="media/icon.png" width="128" height="128" alt="Logo Antigravity Tự Động Phê Duyệt" />
 </p>
 
 <p align="center">
-  <strong>True Hands-Free Automation for Antigravity 2.0 & AI Coding Agents</strong><br />
-  Automatically handles permission dialogs, multi-choice question prompts, "Yes, and always allow..." choices, terminal approvals, and agent actions without interruption.
+  <strong>Giải pháp tự động hóa hoàn toàn không cần chạm tay cho Antigravity 2.0 & AI Coding Agents</strong><br />
+  Tự động xử lý hộp thoại cấp quyền, câu hỏi trắc nghiệm, lựa chọn "Luôn cho phép trong dự án này", xác nhận chạy lệnh terminal mà không làm gián đoạn tiến trình công việc của bạn.
 </p>
 
 <p align="center">
-  <a href="https://github.com/valzevox/antigravity-auto-accept/releases"><img src="https://img.shields.io/github/v/release/valzevox/antigravity-auto-accept?style=flat-square&color=blue" alt="Release"></a>
-  <a href="https://github.com/valzevox/antigravity-auto-accept/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
-  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen?style=flat-square" alt="Node Version"></a>
-  <a href="https://github.com/valzevox/antigravity-auto-accept/stargazers"><img src="https://img.shields.io/github/stars/valzevox/antigravity-auto-accept?style=flat-square" alt="Stars"></a>
-  <a href="https://github.com/valzevox/antigravity-auto-accept/issues"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square" alt="PRs Welcome"></a>
+  <a href="https://github.com/valzevox/antigravity-auto-accept/releases"><img src="https://img.shields.io/github/v/release/valzevox/antigravity-auto-accept?style=flat-square&color=blue" alt="Phiên bản phát hành"></a>
+  <a href="https://github.com/valzevox/antigravity-auto-accept/blob/main/LICENSE"><img src="https://img.shields.io/badge/giấy_phép-MIT-green?style=flat-square" alt="Giấy phép"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/phiên_bản_node-%3E%3D18.0.0-brightgreen?style=flat-square" alt="Phiên bản Node"></a>
+  <a href="https://github.com/valzevox/antigravity-auto-accept/stargazers"><img src="https://img.shields.io/github/stars/valzevox/antigravity-auto-accept?style=flat-square" alt="Lượt thích"></a>
+  <a href="https://github.com/valzevox/antigravity-auto-accept/issues"><img src="https://img.shields.io/badge/đóng_góp-chào_đón-brightgreen.svg?style=flat-square" alt="Chào đón đóng góp"></a>
+</p>
+
+<p align="center">
+  <a href="README.md">🇻🇳 Bản Tiếng Việt</a> | <a href="README_EN.md">🇬🇧 English Documentation</a>
 </p>
 
 ---
 
-## 🌟 Why Antigravity Auto Accept?
+## 🌟 Tại sao bạn cần Antigravity Tự Động Phê Duyệt?
 
-When building large software or letting AI agents complete autonomous multi-step plans, **Antigravity 2.0** often halts and waits for user confirmation:
-- File searching & reading permissions
-- Command execution approvals
-- Multi-choice permission modals (`1. Yes, allow this time`, `2. Yes, and always allow...`)
-- Step requirement inputs and `Submit` clicks
+Khi xây dựng các dự án phần mềm lớn hoặc giao cho AI tự chủ hoàn thành các kế hoạch nhiều bước phức tạp, **Antigravity 2.0** thường xuyên dừng lại để chờ bạn xác nhận thủ công:
+- Yêu cầu cấp quyền tìm kiếm và đọc tập tin mã nguồn
+- Xác nhận cho phép thực thi lệnh trong terminal
+- Hộp thoại hỏi trắc nghiệm quyền truy cập (`1. Cho phép lần này`, `2. Đồng ý và luôn cho phép...`)
+- Các câu hỏi lựa chọn phương án giải quyết và nút `Gửi (Submit)`
 
-**Antigravity Auto Accept** hooks into the Chrome DevTools Protocol (CDP) engine of Antigravity, automatically resolving and accepting these prompts in real time. Never babysit your AI agent again!
-
----
-
-## ✨ Key Features
-
-- 🎯 **Native Antigravity 2.0 Multi-Choice Support**: Intelligently handles the 5-choice permission modals, automatically selects *"Yes, and always allow in this conversation/project"*, and triggers the `Submit` button.
-- 🔄 **Live Progress & Dynamic Loading Dashboard (Discord)**: Real-time progress card that updates in-place every 2.5s. Displays the agent's live thinking trace (`Thinking...`), currently executing tools (`run_command`, `view_file`...), active sub-agent counters & roles, recent auto-approvals feed, and elapsed timer without chat spam! Automatically converts into a clean completion card upon task finish.
-- 🎙️ **Voice Control & Voice-to-Prompt (Groq Whisper)**: Speak naturally into Discord (voice memo or audio attachment) to query sessions, switch tabs, stop tasks, or dispatch prompts directly into Antigravity with instant transcription in ~300ms.
-- 🔀 **Multi-Session Auto-Router & Seamless Background Hop**: Monitors all background conversations across your entire workspace/brain. When an agent in another session halts on a tool or permission request, the router automatically hops to that conversation, approves it, and immediately returns you back to your current active session!
-- 🎮 **Two-Way Remote Interactive Buttons (Discord & Telegram)**: Whenever your AI subagents require input (`ask_question`), the bot pings you with native clickable buttons. Simply tap the option from your mobile or desktop to submit the answer directly into Antigravity!
-- ⚡ **Zero-Port Discord Gateway WebSocket**: Connects directly via `wss://gateway.discord.gg`. Starts automatically with `run.bat` and remains active 24/7 without requiring public IPs, port forwarding, or ngrok tunnels.
-- 🔔 **Smart Multi-Tier Notifications**: Clean Antigravity-branded embeds categorized into 4 distinct events (Manual Intervention, Task Completed, Auto-Approved, Error Logs).
-- 🚀 **100% Standalone Background Daemon**: Runs silently in the background as a lightweight system service or background process without needing VS Code workbench windows.
-- 🛡️ **Dangerous Command Guard**: Built-in safety filter automatically blocks hazardous patterns (`rm -rf /`, `format c:`, `dd if=`, etc.).
-- 🔄 **Auto-Reconnection**: Resilient WebSocket layer detects when Antigravity opens or closes, instantly reconnecting within 3 seconds.
+**Antigravity Tự Động Phê Duyệt** kết nối trực tiếp vào giao thức Chrome DevTools (cổng 9000) của Antigravity, tự động phát hiện và phê duyệt các hộp thoại này trong thời gian thực. Bạn có thể thoải mái rời máy tính hoặc tập trung làm việc khác mà không lo AI bị dừng giữa chừng!
 
 ---
 
-## 📦 Architecture Overview
+## ✨ Tính năng nổi bật
+
+- 🎯 **Hỗ trợ toàn diện hộp thoại trắc nghiệm Antigravity 2.0**: Tự động nhận diện các hộp thoại xin quyền gồm 5 lựa chọn, ưu tiên chọn *"Đồng ý và luôn cho phép trong cuộc trò chuyện/dự án này"* và tự nhấn nút `Gửi (Submit)`.
+- 🔄 **Bảng theo dõi tiến độ thời gian thực trên Discord**: Thẻ trạng thái động tự cập nhật mỗi 2.5 giây. Hiển thị luồng suy nghĩ của Agent, công cụ đang chạy, số lượng sub-agent hoạt động và đồng hồ đếm thời gian. Tự động chuyển thành thẻ hoàn tất màu xanh khi xong việc.
+- ⚠️ **Cảnh báo khẩn cấp khi hết hạn mức token**: Tự động phát hiện khi tài khoản chạm ngưỡng giới hạn token hoặc gặp lỗi và ngắt quãng, lập tức gửi thông báo màu đỏ nổi bật kèm nhắc tên (`@user`) đến điện thoại/máy tính của bạn.
+- 🎙️ **Điều khiển bằng giọng nói siêu tốc (Groq Whisper)**: Gửi tin nhắn thoại hoặc tập tin âm thanh trên Discord để hỏi trạng thái, chuyển phiên làm việc, dừng tác vụ hoặc nạp yêu cầu vào Antigravity với tốc độ nhận diện chỉ khoảng 300ms.
+- 🔀 **Tự động chuyển phiên làm việc trong nền**: Theo dõi tất cả các cuộc trò chuyện chạy ngầm. Khi một phiên khác bị dừng chờ cấp quyền, hệ thống tự chuyển sang phiên đó duyệt quyền rồi quay về phiên bạn đang theo dõi.
+- 🎮 **Tương tác hai chiều qua nút bấm (Discord & Telegram)**: Khi Agent đặt câu hỏi lựa chọn (`ask_question`), bot sẽ gửi thông báo kèm các nút bấm phương án. Bạn chỉ cần nhấn nút trên điện thoại để gửi câu trả lời về máy tính!
+- ⚡ **Kết nối Discord Gateway trực tiếp**: Kết nối qua giao thức WebSocket chính thức của Discord, hoạt động 24/7 mà không cần mở cổng modem, không cần IP tĩnh hay ngrok.
+- 🔔 **Hệ thống thông báo phân loại rõ ràng**: Phân chia theo 4 mức độ (Cần quyết định, Hoàn thành tác vụ, Tự động duyệt, Báo lỗi/Hết hạn mức).
+- 🛡️ **Bộ lọc bảo vệ lệnh nguy hiểm**: Tự động chặn các câu lệnh có khả năng gây hại hệ thống (`rm -rf /`, `format c:`, xóa ổ đĩa hệ thống...).
+- 🔄 **Tự động kết nối lại**: Tự phát hiện khi Antigravity mở hoặc đóng để tái kết nối nhanh chóng trong 3 giây.
+
+---
+
+## 📦 Sơ đồ kiến trúc hệ thống
 
 ```
                       +-----------------------------+
@@ -54,31 +58,31 @@ When building large software or letting AI agents complete autonomous multi-step
                       |  (--remote-debugging-port)  |
                       +--------------+--------------+
                                      ^
-                                     | WebSocket / CDP (:9000)
+                                     | Kết nối WebSocket (:9000)
                                      v
 +-------------------------------------------------------------------+
-|               Antigravity Auto Accept Daemon                      |
+|            Tiến trình nền Tự Động Phê Duyệt                       |
 |                                                                   |
 |   +-----------------------+           +-----------------------+   |
-|   |   CDP Target Hunter   |  ------>  |  Script DOM Injector  |   |
+|   |  Quét cổng kết nối    |  ------>  |  Bộ nạp mã giao diện  |   |
 |   +-----------------------+           +-----------+-----------+   |
 |               |                                   |               |
 |               v                                   v               |
 |   +-----------------------+         +-------------------------+   |
-|   |  MultiSessionRouter   |         |    auto-accept.js DOM   |   |
-|   |  - Disk Brain Watcher |         |  - Select Permission    |   |
-|   |  - Auto-Hop & Return  | <=====> |  - Click Submit         |   |
-|   +-----------------------+         |  - Auto-Resume Agent    |   |
+|   |  Điều phối đa phiên   |         |  Xử lý trên màn hình    |   |
+|   |  - Theo dõi ổ đĩa     |         |  - Chọn mục cấp quyền   |   |
+|   |  - Tự nhảy phiên & về | <=====> |  - Nhấn nút gửi         |   |
+|   +-----------------------+         |  - Tiếp tục tiến trình  |   |
 |                                     +-------------------------+   |
 +-------------------------------------------------------------------+
 ```
 
 ---
 
-## 🚀 Quick Start Guide
+## 🚀 Hướng dẫn cài đặt nhanh
 
-> ⚡ **Cài đặt 1 dòng lệnh duy nhất (giống Free Claude Code):**  
-> Toàn bộ quá trình cài đặt, vá cổng 9000, nhập credentials, và đăng ký tự khởi động khi reset máy được gói gọn trong một script PowerShell duy nhất!
+> ⚡ **Cài đặt chỉ với 1 dòng lệnh duy nhất:**  
+> Toàn bộ quá trình kiểm tra môi trường, cấu hình cổng 9000 cho Antigravity, nhập thông tin bot và đăng ký tự khởi động cùng máy tính được thực hiện tự động hoàn toàn bằng tập lệnh PowerShell!
 
 ### Cách 1: Cài đặt trực tiếp qua PowerShell (Khuyên dùng)
 
@@ -90,7 +94,7 @@ Mở PowerShell trên máy tính của bạn và dán lệnh sau:
 
 ---
 
-### Cách 2: Clone repository & chạy installer
+### Cách 2: Tải mã nguồn về máy & chạy cài đặt
 
 ```bash
 git clone https://github.com/valzevox/antigravity-auto-accept.git
@@ -100,62 +104,62 @@ powershell -ExecutionPolicy Bypass -File scripts\install.ps1
 
 ---
 
-### 🛠️ Script Installer (`install.ps1`) sẽ tự động làm gì?
+### 🛠️ Tập lệnh cài đặt (`install.ps1`) sẽ tự làm những gì?
 
-1. ✅ **Kiểm tra môi trường:** Tự động phát hiện Node.js (>= 18.x) và Git.
-2. ✅ **Cài đặt thư viện:** Chạy `npm install --omit=dev` sạch sẽ.
-3. ✅ **Tự động cấu hình cổng (Port 9000):** Tự quét toàn bộ Desktop và Start Menu để thêm cờ `--remote-debugging-port=9000` vào shortcut Antigravity.
-4. ✅ **Trình nhập Credentials tương tác:** Cho phép bạn dán ngay Discord Bot Token, Channel ID, Owner ID, Groq API Key vào cửa sổ console (nhấn Enter để bỏ qua nếu chưa có).
-5. ✅ **Đăng ký tự khởi động (Windows Task Scheduler):** Đăng ký tác vụ hệ thống `AntigravityAutoAccept` kích hoạt khi bạn đăng nhập Windows (`-AtLogOn`).
-6. ✅ **Kích hoạt ngay:** Khởi chạy daemon lập tức.
-
----
-
-### 🔄 Cơ chế tự động khi khởi động lại máy tính (Reboot)
-
-Khi máy tính của bạn khởi động lại:
-- Task Scheduler sẽ tự động chạy: **`update.bat` ➔ `run.bat`**.
-- **`update.bat`**: Kiểm tra GitHub xem bạn có commit mới không, nếu có thì tự kéo về (`git pull`) và cài thêm gói (`npm install`) trong 1-2 giây.
-- **`run.bat`**: Khởi động daemon phục vụ bạn ngay lập tức.
-- Bạn **KHÔNG** cần phải chạy lại `install.ps1` hay thao tác gì thêm!
+1. ✅ **Kiểm tra môi trường:** Tự động phát hiện phiên bản Node.js (từ 18 trở lên) và Git.
+2. ✅ **Cài đặt thư viện:** Cài đặt các gói phụ thuộc cần thiết.
+3. ✅ **Tự cấu hình cổng 9000:** Tự động gắn cờ `--remote-debugging-port=9000` vào lối tắt (shortcut) khởi động Antigravity trên Màn hình chính (Desktop) và Start Menu.
+4. ✅ **Nhập cấu hình tương tác:** Cho phép bạn dán ngay thông tin Discord Bot Token, Mã kênh, Mã người dùng quản trị, Khóa API Groq trực tiếp trên cửa sổ cài đặt.
+5. ✅ **Đăng ký khởi động cùng hệ thống:** Đăng ký tác vụ hệ thống trong Windows Task Scheduler để tự chạy mỗi khi bạn đăng nhập vào Windows.
+6. ✅ **Kích hoạt ngay:** Khởi chạy tiến trình phục vụ bạn ngay lập tức.
 
 ---
 
-### 📋 Command Reference
+### 🔄 Cơ chế tự động cập nhật khi khởi động lại máy tính
 
-Ở thư mục gốc dự án chỉ giữ lại các file thiết yếu:
+Mỗi khi máy tính của bạn khởi động lại:
+- Hệ thống sẽ tự động thực hiện: **Kiểm tra bản cập nhật (`update.bat`) ➔ Chạy tiến trình (`run.bat`)**.
+- **`update.bat`**: Tự động so sánh phiên bản trên GitHub, nếu có bản mới sẽ tự tải về và cập nhật thư viện trong 1-2 giây.
+- **`run.bat`**: Khởi động tiến trình giám sát và hiển thị cửa sổ làm việc trực quan.
+- Bạn **không cần** phải chạy lại lệnh cài đặt hay thao tác thủ công nào thêm.
 
-| Command | Mô tả |
+---
+
+## 📋 Danh mục tập lệnh trong thư mục
+
+Thư mục chính được tinh gọn tối đa:
+
+| Tập lệnh | Chức năng |
 | :--- | :--- |
-| `run.bat` | Khởi chạy daemon với cửa sổ Console trực quan (tương thích Windows 10 & 11) |
-| `update.bat` | Kiểm tra cập nhật GitHub thủ công ngay lập tức |
-| `status.bat` | Kiểm tra xem daemon có đang chạy và CDP port 9000 có hoạt động không |
-| `powershell -File scripts\install.ps1` | Chạy lại trình cài đặt hoặc cập nhật credentials bất cứ lúc nào |
+| `run.bat` | Khởi chạy chương trình với cửa sổ theo dõi trực quan (tương thích cả Windows 10 & 11) |
+| `update.bat` | Kiểm tra và cập nhật mã nguồn mới nhất từ GitHub |
+| `status.bat` | Kiểm tra tình trạng hoạt động của tiến trình và cổng kết nối Antigravity |
+| `powershell -File scripts\install.ps1` | Chạy lại trình cài đặt hoặc nhập lại cấu hình bất kỳ lúc nào |
 
 ---
 
-### Step 3: Hướng dẫn cấu hình chi tiết (Discord & Telegram)
+## ⚙️ Hướng dẫn cấu hình chi tiết (Discord & Telegram)
 
-Mở file **`config.json`** (được tạo tự động ở Bước 2) và điền thông tin của bạn:
+Mở tập tin **`config.json`** trong thư mục dự án để điền các thông tin của bạn:
 
 ```json
 {
   "webhooks": {
-    "discord": "https://discord.com/api/webhooks/YOUR_WEBHOOK_URL",
+    "discord": "https://discord.com/api/webhooks/ĐƯỜNG_DẪN_WEBHOOK_CỦA_BẠN",
     "discordBot": {
-      "token": "YOUR_DISCORD_BOT_TOKEN",
-      "channelId": "YOUR_CHANNEL_ID",
-      "guildId": "YOUR_GUILD_ID",
-      "ownerUserId": "YOUR_DISCORD_USER_ID",
-      "mentionUserId": "YOUR_DISCORD_USER_ID"
+      "token": "MÃ_TOKEN_BOT_DISCORD",
+      "channelId": "MÃ_KÊNH_DISCORD",
+      "guildId": "MÃ_MÁY_CHỦ_DISCORD",
+      "ownerUserId": "MÃ_NGƯỜI_DÙNG_QUẢN_TRỊ",
+      "mentionUserId": "MÃ_NGƯỜI_DÙNG_ĐƯỢC_NHẮC_TÊN"
     },
     "telegram": {
-      "botToken": "YOUR_TELEGRAM_BOT_TOKEN",
-      "chatId": "YOUR_CHAT_ID"
+      "botToken": "MÃ_TOKEN_BOT_TELEGRAM",
+      "chatId": "MÃ_CUỘC_TRÒ_CHUYỆN_TELEGRAM"
     },
     "customUrl": ""
   },
-  "groqApiKey": "YOUR_GROQ_API_KEY",
+  "groqApiKey": "KHÓA_API_GROQ",
   "events": {
     "onManualIntervention": true,
     "onTaskCompleted": true,
@@ -165,238 +169,78 @@ Mở file **`config.json`** (được tạo tự động ở Bước 2) và đi�
 }
 ```
 
-> 💡 **Không muốn dùng kênh nào?** Có thể để trống/`""`. Bot sẽ tự bỏ qua kênh đó (ví dụ: chỉ dùng Discord thì bỏ trống `telegram.botToken` và `telegram.chatId`).
+> 💡 **Lưu ý:** Nếu bạn chỉ sử dụng Discord, các mục của Telegram có thể để trống và ngược lại.
 
 ---
 
-### Step 3.1: 🤖 Cấu hình Discord Bot (khuyên dùng)
+### Hướng dẫn lấy thông tin Discord Bot
 
-Để điều khiển Antigravity 2 chiều từ Discord (gửi prompt, nghe voice, nhận thông báo, bấm nút trả lời):
-
-1. **Tạo Discord Application & Bot**:
-   - Vào [Discord Developer Portal](https://discord.com/developers/applications) → **New Application** → đặt tên → **Create**.
-   - Chuyển sang tab **Bot** → **Reset Token** → **Copy** → dán vào `discordBot.token` trong `config.json`.
-2. **Bật quyền cho Bot** (trong tab **Bot** → *Privileged Gateway Intents*):
-   - ✅ **Message Content Intent** (BẮT BUỘC — để bot đọc được nội dung lệnh `!prompt`).
-3. **Mời Bot vào server** (tab **OAuth2** → **URL Generator**):
-   - Scopes: ✅ `bot`
-   - Bot Permissions: ✅ `Send Messages`, ✅ `Read Message History`, ✅ `Embed Links`, ✅ `Attach Files`, ✅ `Add Reactions`.
-   - Copy URL được tạo → mở trên trình duyệt → chọn server của bạn → **Authorize**.
-4. **Lấy các ID cần thiết**:
-   - Bật **Developer Mode** trong Discord: *User Settings → Advanced → Developer Mode*.
-   - **Channel ID** (`channelId` + `!setchannel`): Chuột phải vào kênh muốn dùng → **Copy Channel ID**.
-   - **Guild ID** (*không bắt buộc*): Chuột phải vào server → **Copy Server ID**.
-   - **Owner User ID** (`ownerUserId` + `mentionUserId`): Chuột phải vào avatar của bạn → **Copy User ID**.
-     > 🔒 `ownerUserId` là ID chủ sở hữu — chỉ tài khoản này mới chạy được các lệnh điều khiển và voice. Người khác trong server gõ lệnh sẽ bị từ chối!
-5. **(Khuyên dùng) Lấy Webhook URL** (`discord` — cho thông báo embed đẹp có nút bấm):
-   - Chuột phải vào kênh → **Edit Channel** → **Integrations** → **Webhooks** → **New Webhook** → **Copy Webhook URL** → dán vào `discord`.
-6. **(Tùy chọn) Groq API Key** (`groqApiKey` — bật nhận diện giọng nói):
-   - Vào [console.groq.com/keys](https://console.groq.com/keys) → **Create API Key** → copy → dán vào `groqApiKey`.
-   - Hoặc set trực tiếp trong Discord bằng lệnh: `!setgroq gsk_...`
+1. **Tạo ứng dụng và Bot**:
+   - Truy cập trang [Discord Developer Portal](https://discord.com/developers/applications) → Nhấn **New Application** → Đặt tên ứng dụng → Nhấn **Create**.
+   - Chọn mục **Bot** ở thanh bên trái → Nhấn **Reset Token** → Sao chép mã token và dán vào `discordBot.token`.
+2. **Cấp quyền đọc tin nhắn cho Bot**:
+   - Trong trang cấu hình Bot, tìm phần **Privileged Gateway Intents** → Bật mục **Message Content Intent** (Bắt buộc để bot nhận lệnh).
+3. **Mời Bot vào máy chủ của bạn**:
+   - Vào mục **OAuth2** → **URL Generator**.
+   - Phần Scopes tích chọn: `bot`.
+   - Phần Bot Permissions tích chọn: `Send Messages`, `Read Message History`, `Embed Links`, `Attach Files`.
+   - Sao chép đường dẫn được tạo, mở trên trình duyệt và thêm bot vào máy chủ của bạn.
+4. **Lấy các mã định danh cần thiết**:
+   - Bật **Chế độ nhà phát triển (Developer Mode)** trong Discord: *Cài đặt người dùng → Nâng cao → Chế độ nhà phát triển*.
+   - **Mã kênh (`channelId`)**: Nhấp chuột phải vào kênh muốn nhận thông báo → Chọn **Sao chép ID kênh**.
+   - **Mã người dùng quản trị (`ownerUserId`)**: Nhấp chuột phải vào tài khoản của bạn → Chọn **Sao chép ID người dùng**.
 
 ---
 
-### Step 3.2: 📨 Cấu hình Telegram Bot (tùy chọn)
+### Hướng dẫn lấy thông tin Telegram Bot
 
-Để nhận thông báo và bấm nút trả lời trực tiếp trên Telegram:
-
-1. **Tạo Bot qua BotFather**:
-   - Mở Telegram → tìm **@BotFather** → gửi `/newbot` → đặt tên & username cho bot.
-   - BotFather trả về **HTTP API Token** (dạng `123456:ABC-DEF...`) → dán vào `telegram.botToken`.
-2. **Lấy Chat ID**:
-   - **Cách A**: Nhắn bất kỳ tin gì cho bot của bạn, sau đó mở trình duyệt truy cập:
-     `https://api.telegram.org/bot<BOT_TOKEN>/getUpdates`
-     → tìm giá trị `"chat":{"id":...}` → đó là Chat ID → dán vào `telegram.chatId`.
-   - **Cách B**: Dùng bot [@userinfobot](https://t.me/userinfobot) → nó trả về `Id` của bạn.
-   - **Cách C (Nhóm)**: Thêm bot vào nhóm → lấy Chat ID nhóm (thường bắt đầu bằng dấu `-`).
-3. Dán `telegram.botToken` và `telegram.chatId` vào `config.json`.
+1. Mở ứng dụng Telegram, tìm kiếm **@BotFather** và gửi lệnh `/newbot`.
+2. Đặt tên hiển thị và tên định danh (username kết thúc bằng chữ `bot`) cho bot.
+3. BotFather sẽ gửi cho bạn chuỗi **HTTP API Token** → dán chuỗi này vào `telegram.botToken`.
+4. Để lấy **Mã cuộc trò chuyện (`chatId`)**, nhắn tin cho bot [@userinfobot](https://t.me/userinfobot) để xem mã số ID của bạn.
 
 ---
 
-### Step 4: Khởi động lại & Test
+## 🎮 Danh sách lệnh điều khiển trên Discord
 
-1. Chạy lại daemon để nạp cấu hình mới: **nhấn đúp [`run.bat`](run.bat)** (hoặc [`run-win11.bat`](run-win11.bat) để xem log trực tiếp trên Windows 11).
-2. **Khởi động lại Antigravity** bằng shortcut đã được patch (bước setup).
-3. Test trên Discord/Telegram bằng lệnh:
-   - `!status` → kiểm tra kết nối CDP & session hiện tại.
-   - `!prompt hello world` → gửi thử 1 prompt vào Antigravity.
-   - Gửi 1 tin nhắn voice note → kiểm tra nhận diện giọng nói (nếu đã bật Groq).
+Bạn có thể tương tác và quản lý Antigravity trực tiếp từ kênh Discord đã thiết lập:
 
-> ✅ **Xong!** Từ giờ hệ thống sẽ **tự động cập nhật code** mỗi khi khởi động máy và **tự chạy daemon** ngầm — bạn không cần thao tác gì thêm.
-
----
-
-### 🔄 Cập nhật phiên bản mới
-
-Bạn **không cần làm gì cả**! Mỗi lần khởi động lại máy, daemon tự động so sánh commit với GitHub và kéo bản mới nhất về.
-
-Muốn cập nhật thủ công ngay lập tức: **nhấn đúp [`update.bat`](update.bat)**.
-
----
-
-### Manual Alternative (Advanced Users)
-
-```bash
-# Install dependencies
-npm install
-
-# Patch Antigravity shortcuts
-powershell -ExecutionPolicy Bypass -File scripts\update-shortcuts.ps1
-
-# Start the background daemon
-run.bat
-```
-
----
-
-## 📋 Command Reference
-
-| Command | Description |
-| :--- | :--- |
-| `setup.bat` | Full 1-click setup: install, patch shortcuts, register startup, run daemon |
-| `update.bat` | 🔄 **1-Click Auto-Updater**: Checks remote GitHub commits, pulls changes, updates packages, and restarts daemon |
-| `run.bat` | Start or restart the background daemon (auto-checks for GitHub updates on startup) |
-| `run-win11.bat` | **Windows 11**: Start or restart with a **visible popup Console window** + auto-updates on startup |
-| `status.bat` | Check if the daemon is running and CDP is connected |
-| `node daemon.js` | Run daemon in foreground (for debugging) |
-| `node test-multi-session.js` | Run self-test for Multi-Session Auto-Router detection |
-| `node test-notifier.js` | Run self-test for Discord & Telegram Webhook notifications |
-
-> 💡 **Tự động cập nhật khi khởi động máy (Boot Auto-Update)**: Mỗi khi bạn khởi động lại máy tính (Windows Startup / Reboot), hệ thống sẽ tự động so sánh commit với GitHub, kéo bản mới nhất về (`git pull`) và cập nhật dependencies rồi mới khởi chạy daemon. Không cần phải mở PowerShell hay thao tác thủ công!
-
----
-
-## 🔔 Webhook Notifications & Remote Action Buttons (Discord & Telegram)
-
-Get alerted on Discord or Telegram whenever your AI subagents require attention, styled with native **Antigravity branding** (custom avatar, signature footer, and event color-coding):
-
-### Event Types:
-- 1️⃣ **Case 1 (Manual Intervention Required)**:
-  - Subagent asks an interactive question (`ask_question`).
-  - **Discord**: Automatically pings your user tag (`@username`) and attaches native **Clickable Action Buttons** (Options 1, 2, 3...) directly under the embed.
-  - **Telegram**: Attaches native **Inline Keyboard Buttons**.
-  - **Remote Action**: Tap any button on your phone or PC → Antigravity automatically hops to the session, selects your answer, and clicks `Submit`!
-- 2️⃣ **Case 2 (Task Completed)**: Subagent finishes its execution turn without further tool calls. Clean embed notification with no noisy pings.
-- 3️⃣ **Case 3 (Auto-Approved)**: Daemon auto-detects and accepts permissions in background sessions (`⚡ Auto-Approved`). Quiet notification without user mention.
-- 4️⃣ **Case 4 (Execution Error)**: Detailed error reports with runtime stack traces for troubleshooting.
-
----
-
-### Configuration:
-
-Chi tiết cách lấy Token và cấu hình `config.json` xem tại [Step 3: Cấu hình Discord & Telegram](#step-3-điền-thông-tin-discord--telegram-vào-configjson).
-
----
-
----
-
-### Remote Two-Way Discord Controller:
-
-Manage Antigravity directly from Discord — both receive notifications AND send prompts back into the IDE:
-
-| Command | Description | Example |
-|---|---|---|
-| `!prompt <text>` | **Send a prompt directly into Antigravity** and execute it | `!prompt fix the bug in index.js` |
-| `!message <text>` | Alias of `!prompt` | `!message build a login page` |
-| `!ask <text>` | Alias of `!prompt` | `!ask summarize this repo` |
-| `!new <text>` | Open a fresh Antigravity session, then send the prompt | `!new refactor auth module` |
-| `!stop` | Emergency stop the currently running task | `!stop` |
-| `!sessions` | **List open sessions & highlights active session** | `!sessions` |
-| `!switch <id \| name>` | **Switch Antigravity to another session by ID or name** | `!switch 89e10449` / `!switch Higgsfield` |
-| `!setgroq <key>` | **Set Groq API key for Speech-to-Text voice transcription** | `!setgroq gsk_...` |
-| `!status` | Check Antigravity CDP connection & active session | `!status` |
-| `!config` | View active notification channel & ping settings | `!config` |
-| `!setchannel <#channel \| id>` | Change notification & prompt channel live | `!setchannel #agent-logs` |
-| `!setping <target>` | Change ping target on prompts & task completion | `!setping here` / `!setping @valzevox` / `!setping off` |
-| `!channels` | List server text channels with IDs for easy selection | `!channels` |
-| `!setvoice <on\|off>` | Bật hoặc tắt tính năng nhận diện giọng nói (Voice Control) | `!setvoice off` |
-| `!help` | Show command help in an interactive embed | `!help` |
-
-> **🛡️ Channel Isolation (Cách ly kênh bảo mật):**
-> Bot **chỉ lắng nghe và xử lý tin nhắn / voice note trong đúng Channel ID** được cấu hình trong `config.json` (hoặc đặt qua `!setchannel`). Tất cả tin nhắn, tập tin audio, hay voice note ở các kênh khác trong server đều được bỏ qua 100%, chống trigger nhầm!
-
-> **🎙️ Voice-to-Prompt & Voice Control:**
-> Gửi file âm thanh hoặc nhấn giữ ghi âm trực tiếp trên Discord vào đúng kênh của bot!
-> - Nếu bạn không muốn nhận diện voice, có thể gõ `!setvoice off` để tắt bất cứ lúc nào!
-> - Khi bật (`!setvoice on`):
->   1. Chuyển đổi âm thanh tự động và nhận diện qua Groq Whisper (`whisper-large-v3-turbo`) siêu tốc (~300ms).
->   2. **Phân tích khẩu lệnh (Voice Commands):**
->      - *"Danh sách session"* / *"Xem các phiên"* ➡️ Tự động liệt kê các sessions đang mở.
->      - *"Chuyển sang session <tên hoặc ID>"* ➡️ Tự động chuyển tab Antigravity sang phiên đó.
->      - *"Dừng lại"* / *"Hủy task"* ➡️ Dừng tác vụ đang chạy.
->      - *"Trạng thái"* / *"Status"* ➡️ Kiểm tra tình trạng kết nối.
->      - *"Phiên mới: <prompt>"* ➡️ Mở phiên làm việc mới và nạp prompt.
->      - *Mọi câu nói thông thường khác* ➡️ Tự động nạp thành Prompt vào phiên hiện tại và nhấn Enter!
-
-> **Note:** `!prompt` requires Antigravity to be open on this machine. If the IDE is closed the bot replies with a clear error so you know nothing was lost.
-
-> 🔗 **Hướng dẫn tạo Bot & lấy Token/ID:** Xem chi tiết tại [Step 3.1: Cấu hình Discord Bot](#step-31--cấu-hình-discord-bot-khuyên-dùng).
-
----
-
-## 🔍 Diagnostics &amp; Health Check
-
-Check the live status of the auto-accept engine at any time by double-clicking **`status.bat`**:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File status.ps1
-```
-
-Example Output:
-```text
-RUNNING PID=22888
---- last 3 log lines ---
-[AutoAccept] [CDP] Script injected into 9000:DDB37C2BA90087861A99D944E41AAC30
-[AutoAccept Daemon] Successfully connected to Antigravity 2.0 via CDP!
---- CDP port 9000 ---
-CDP OK (200)
-```
-
----
-
-## ⚙️ Configuration
-
-Custom settings can be adjusted in `main_scripts/cdp-handler.js` or through environment configurations:
-
-| Option | Default | Description |
+| Câu lệnh | Mô tả | Ví dụ |
 | :--- | :--- | :--- |
-| `cdpPort` | `9000` | Port for Chrome DevTools Protocol WebSocket. |
-| `pollInterval` | `500ms` | Frequency of DOM scans for pending modal inputs. |
-| `isBackgroundMode`| `true` | Allows continuous approvals when window is unfocused. |
+| `!prompt <nội dung>` | Gửi yêu cầu công việc trực tiếp vào Antigravity | `!prompt hãy sửa lỗi trong file index.js` |
+| `!message <nội dung>` | Tương tự lệnh `!prompt` | `!message viết tài liệu hướng dẫn` |
+| `!new <nội dung>` | Tạo một phiên làm việc mới và nạp yêu cầu | `!new thiết kế trang đăng nhập` |
+| `!stop` | Dừng ngay lập tức tác vụ đang chạy | `!stop` |
+| `!sessions` | Xem danh sách các phiên làm việc đang có | `!sessions` |
+| `!switch <mã hoặc tên>` | Chuyển Antigravity sang phiên làm việc được chọn | `!switch 89e10449` |
+| `!status` | Kiểm tra tình trạng kết nối và phiên đang hoạt động | `!status` |
+| `!config` | Xem cấu hình hiện tại của bot | `!config` |
+| `!language` | Mở bảng nút bấm chọn ngôn ngữ hiển thị (Tiếng Việt / English) | `!language` hoặc `!lang en` |
+| `!setchannel <#kênh>` | Thay đổi kênh nhận thông báo và câu hỏi | `!setchannel #nhat-ky-agent` |
+| `!setping <đối tượng>` | Cài đặt đối tượng nhắc tên khi có câu hỏi hoặc hết hạn mức | `!setping @valzevox` hoặc `!setping off` |
+| `!setvoice <on/off>` | Bật hoặc tắt tính năng điều khiển bằng giọng nói | `!setvoice off` |
+| `!setgroq <khóa api>` | Thiết lập khóa API Groq để chuyển giọng nói thành văn bản | `!setgroq gsk_...` |
+| `!help` | Hiển thị bảng trợ giúp danh sách câu lệnh | `!help` |
 
 ---
 
-## 🛡️ Safety & Command Blacklist
+## 🛡️ Danh mục câu lệnh nguy hiểm được bảo vệ
 
-The auto-accept engine protects your machine by refusing to auto-click approvals containing destructive patterns:
-- `rm -rf /` / `rm -rf ~` / `rm -rf *`
-- `format c:` / `del /f /s /q`
-- `mkfs.*` / `> /dev/sda`
-- Fork bombs and destructive system calls
-
----
-
-## 🤝 Contributing
-
-Contributions, issues, and feature requests are welcome!
-Feel free to check the [Issues page](https://github.com/valzevox/antigravity-auto-accept/issues).
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'feat: add amazing feature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+Hệ thống tích hợp sẵn cơ chế bảo vệ máy tính, tự động từ chối tự phê duyệt các lệnh có nguy cơ xóa hoặc làm hư hại hệ điều hành:
+- Các lệnh xóa gốc: `rm -rf /`, `rm -rf ~`, `rm -rf *`
+- Các lệnh định dạng lại ổ đĩa: `format c:`, `del /f /s /q`
+- Các thao tác ghi đè ổ đĩa hoặc fork bomb làm treo máy
 
 ---
 
-## 💖 Support & Donate
+## 💖 Đóng góp & Ủng hộ tác giả
 
-If **Antigravity Auto Accept** saved your time and made your workflow seamless, consider buying me a coffee or supporting my work:
+Nếu dự án **Antigravity Tự Động Phê Duyệt** giúp ích cho công việc hàng ngày của bạn, hãy cân nhắc ủng hộ tác giả một ly cà phê nhé:
 
 <p align="left">
-  <a href="https://ko-fi.com/m1n698"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support on Ko-fi" /></a>
+  <a href="https://ko-fi.com/m1n698"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Ủng hộ qua Ko-fi" /></a>
   &nbsp;&nbsp;
-  <a href="https://zypage.com/m1n6"><img src="https://img.shields.io/badge/Donate-ZyPage-blueviolet?style=for-the-badge&logo=heart" alt="Donate on ZyPage" /></a>
+  <a href="https://zypage.com/m1n6"><img src="https://img.shields.io/badge/Ủng_hộ-ZyPage-blueviolet?style=for-the-badge&logo=heart" alt="Ủng hộ qua ZyPage" /></a>
 </p>
 
 - **Ko-fi:** [ko-fi.com/m1n698](https://ko-fi.com/m1n698)
@@ -404,14 +248,14 @@ If **Antigravity Auto Accept** saved your time and made your workflow seamless, 
 
 ---
 
-## 👤 Author
+## 👤 Tác giả
 
 **valzevox**
 - GitHub: [@valzevox](https://github.com/valzevox)
-- Email: [valzevox@gmail.com](mailto:valzevox@gmail.com)
+- Thư điện tử: [valzevox@gmail.com](mailto:valzevox@gmail.com)
 
 ---
 
-## 📄 License
+## 📄 Giấy phép
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Dự án được phân phối dưới giấy phép mã nguồn mở MIT - xem chi tiết tại tập tin [LICENSE](LICENSE).
