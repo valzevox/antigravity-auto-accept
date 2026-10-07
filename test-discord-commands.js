@@ -123,7 +123,29 @@ async function run() {
     sentMessages = [];
     await handler.handleMessage({ author: { bot: false }, channel_id: 'chan_1', content: '!switch 89e10449' });
     assert.strictEqual(sentMessages.length, 1);
-    assert.strictEqual(sentMessages[0].embed.title, '🔀 Đã chuyển phiên làm việc thành công!');
+    // Test 13: !setgroq
+    sentMessages = [];
+    await handler.handleMessage({ author: { bot: false }, channel_id: 'chan_1', content: '!setgroq gsk_dummy_key_123456789' });
+    assert.strictEqual(sentMessages.length, 1);
+    assert.ok(sentMessages[0].content.includes('Đã lưu Groq API Key thành công'));
+
+    // Test 14: Voice attachment dispatch
+    handler.voiceHandler.processDiscordVoice = async () => 'build a landing page';
+    sentMessages = [];
+    await handler.handleMessage({
+        author: { bot: false, id: '111', username: 'valzevox' },
+        channel_id: 'chan_1',
+        content: '',
+        attachments: [{
+            name: 'voice-message.ogg',
+            content_type: 'audio/ogg',
+            url: 'https://cdn.discord.com/fake.ogg'
+        }]
+    });
+    // First message is "Đang nhận diện giọng nói...", second is the embed
+    assert.strictEqual(sentMessages.length, 2);
+    assert.strictEqual(sentMessages[1].embed.title, '🎙️ Voice Transcribed & Sent to Antigravity!');
+    assert.ok(sentMessages[1].embed.description.includes('build a landing page'));
 
     console.log('DiscordCommandHandler self-check: PASS');
 }

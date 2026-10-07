@@ -196,12 +196,19 @@ Manage Antigravity directly from Discord — both receive notifications AND send
 | `!stop` | Emergency stop the currently running task | `!stop` |
 | `!sessions` | **List open sessions & highlights active session** | `!sessions` |
 | `!switch <id \| name>` | **Switch Antigravity to another session by ID or name** | `!switch 89e10449` / `!switch Higgsfield` |
+| `!setgroq <key>` | **Set Groq API key for Speech-to-Text voice transcription** | `!setgroq gsk_...` |
 | `!status` | Check Antigravity CDP connection & active session | `!status` |
 | `!config` | View active notification channel & ping settings | `!config` |
 | `!setchannel <#channel \| id>` | Change notification & prompt channel live | `!setchannel #agent-logs` |
 | `!setping <target>` | Change ping target on prompts & task completion | `!setping here` / `!setping @valzevox` / `!setping off` |
 | `!channels` | List server text channels with IDs for easy selection | `!channels` |
 | `!help` | Show command help in an interactive embed | `!help` |
+
+> **🎙️ Voice-to-Prompt Support:**
+> Send an audio file or record a Discord voice note into the bot channel! The bot automatically:
+> 1. Converts audio via FFmpeg to 16kHz mono MP3.
+> 2. Transcribes with Groq Whisper (`whisper-large-v3-turbo`) in ~300ms.
+> 3. Dispatches the text prompt directly into Antigravity via CDP and presses Enter!
 
 > **Note:** `!prompt` requires Antigravity to be open on this machine. If the IDE is closed the bot replies with a clear error so you know nothing was lost.
 

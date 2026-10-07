@@ -8,12 +8,15 @@ const path = require('path');
 const https = require('https');
 
 const CONFIG_PATH = path.resolve(__dirname, '../config.json');
+const { VoiceHandler } = require('./voice-handler');
 
 class DiscordCommandHandler {
     constructor(gateway, router, log = console.log) {
         this.gateway = gateway;
         this.router = router;
         this.log = log;
+        const cfg = this.loadConfig();
+        this.voiceHandler = new VoiceHandler(cfg, log);
     }
 
     loadConfig() {
@@ -39,6 +42,21 @@ class DiscordCommandHandler {
 
     async handleMessage(message) {
         if (!message || message.author?.bot) return;
+
+        // Check for Voice message / Audio attachments first
+        const attachments = message.attachments || [];
+        const audioAttachment = attachments.find(a => {
+            const ct = (a.content_type || '').toLowerCase();
+            const fn = (a.filename || a.name || '').toLowerCase();
+            return ct.startsWith('audio/') || 
+                   fn.endsWith('.ogg') || fn.endsWith('.mp3') || fn.endsWith('.wav') || 
+                   fn.endsWith('.m4a') || fn.endsWith('.oga');
+        });
+
+        if (audioAttachment) {
+            await this.handleVoiceMessage(message, audioAttachment);
+            return;
+        }
 
         const content = (message.content || '').trim();
         if (!content.startsWith('!') && !content.startsWith('/')) return;
@@ -86,10 +104,69 @@ class DiscordCommandHandler {
             case 'setping':
                 await this.cmdSetPing(message, args);
                 break;
+            case 'setgroq':
+            case 'groq':
+                await this.cmdSetGroq(message, args[0]);
+                break;
             case 'channels':
             case 'listchannels':
                 await this.cmdListChannels(message);
                 break;
+        }
+    }
+
+    async handleVoiceMessage(message, attachment) {
+        const user = message.author?.username || 'Unknown';
+        this.log(`[Voice] Received voice attachment from @${user}: ${attachment.url}`);
+
+        try {
+            await this.reply(message.channel_id, '🎙️ **Đang nhận diện giọng nói qua Groq Whisper...**');
+            const transcribed = await this.voiceHandler.processDiscordVoice(attachment);
+
+            if (!transcribed || transcribed.trim().length === 0) {
+                return this.reply(message.channel_id, '⚠️ Không nhận diện được âm thanh hoặc giọng nói quá nhỏ.');
+            }
+
+            const embed = {
+                title: '🎙️ Voice Transcribed & Sent to Antigravity!',
+                description: `**Nội dung nhận diện:**\n> "${transcribed}"`,
+                color: 0x5865F2,
+                fields: [
+                    { name: 'Người gửi', value: `<@${message.author.id}>`, inline: true },
+                    { name: 'Model', value: '`whisper-large-v3-turbo`', inline: true }
+                ],
+                footer: { text: 'Antigravity Voice Bridge' }
+            };
+
+            await this.reply(message.channel_id, '', embed);
+
+            // Send into Antigravity
+            const res = await this.router.sendPrompt(transcribed, false);
+            if (!res || !res.ok) {
+                await this.reply(message.channel_id, `⚠️ Không thể nạp prompt vào Antigravity: ${res?.error || 'Lỗi kết nối'}`);
+            }
+        } catch (err) {
+            this.log(`[Voice Error] ${err.message}`);
+            await this.reply(message.channel_id, `❌ **Lỗi xử lý voice:** ${err.message}`);
+        }
+    }
+
+    async cmdSetGroq(message, apiKey) {
+        if (!apiKey || !apiKey.trim()) {
+            return this.reply(message.channel_id, '❌ Cách dùng: `!setgroq <groq_api_key>`\nLấy key miễn phí tại: https://console.groq.com/keys');
+        }
+
+        const key = apiKey.trim();
+        const cfg = this.loadConfig();
+        cfg.groqApiKey = key;
+        const ok = this.saveConfig(cfg);
+
+        if (ok) {
+            this.voiceHandler.setGroqApiKey(key);
+            const masked = key.slice(0, 8) + '...' + key.slice(-4);
+            await this.reply(message.channel_id, `✅ **Đã lưu Groq API Key thành công:** \`${masked}\`\n🎙️ Bây giờ bạn có thể gửi voice note vào kênh này, bot sẽ tự động nhận diện và gửi prompt vào Antigravity!`);
+        } else {
+            await this.reply(message.channel_id, '❌ Không thể ghi vào config.json');
         }
     }
 
