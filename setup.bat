@@ -16,9 +16,13 @@ if %errorlevel% neq 0 (
 )
 echo [1/4] Node.js detected: OK
 
-:: 2. Install Dependencies
+:: 2. Install Dependencies & Initialize Config
 echo [2/4] Installing dependencies...
 cd /d "%~dp0"
+if not exist "config.json" (
+    copy "config.json.example" "config.json" >nul 2>&1
+    echo [INFO] Created config.json from template.
+)
 call npm install --silent
 if %errorlevel% neq 0 (
     echo [WARNING] npm install finished with warnings, continuing...

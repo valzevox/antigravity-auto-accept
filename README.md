@@ -77,8 +77,12 @@ When building large software or letting AI agents complete autonomous multi-step
 
 ## 🚀 Quick Start Guide
 
+> **👉 Chỉ cần chạy DUY NHẤT 1 file cho lần setup đầu tiên: [`setup.bat`](#step-2-chạy-file-setupbat-duy-nhất)**
+> Sau khi setup xong, mọi thứ (auto-update + auto-start khi khởi động máy) sẽ tự động diễn ra. Bạn không cần chạy lại bất cứ file nào nữa!
+
 ### Prerequisites
 - [Node.js](https://nodejs.org) >= 18.x
+- [Git](https://git-scm.com/) (để bật tính năng tự động cập nhật)
 - Antigravity 2.0 (or Cursor / VS Code)
 
 ---
@@ -92,23 +96,118 @@ cd antigravity-auto-accept
 
 ---
 
-### Step 2: Run the 1-Click Setup
+### Step 2: Chạy file `setup.bat` (duy nhất)
 
-Double-click **`setup.bat`** (or right-click &gt; *Run as Administrator*).
+**Nhấn đúp chuột vào [`setup.bat`](setup.bat)** (hoặc chuột phải → *Run as Administrator*).
 
-The setup script automatically handles everything:
+Đây là **file DUY NHẤT** bạn cần chạy cho lần cài đặt đầu tiên. Script sẽ tự động:
 
-1. ✅ Verifies Node.js is installed
-2. ✅ Installs npm dependencies
-3. ✅ Patches all Antigravity Desktop &amp; Start Menu shortcuts with `--remote-debugging-port=9000`
-4. ✅ Registers a Windows Scheduled Task so the daemon auto-starts on login
-5. ✅ Launches the background daemon immediately
+1. ✅ Kiểm tra Node.js đã cài chưa
+2. ✅ Tạo file `config.json` từ template `config.json.example` (nếu chưa có)
+3. ✅ Cài đặt toàn bộ npm dependencies
+4. ✅ Vá tất cả shortcut Antigravity Desktop & Start Menu với `--remote-debugging-port=9000`
+- ✅ Đăng ký Windows Scheduled Task để daemon tự chạy khi khởi động máy
+- ✅ Chạy daemon ngầm ngay lập tức
 
 ---
 
-### Step 3: Restart Antigravity
+### Step 3: Điền thông tin Discord / Telegram vào `config.json`
 
-Close Antigravity and reopen it using your (now-patched) shortcut. The auto-accept engine is now fully active.
+Mở file **`config.json`** (được tạo tự động ở Bước 2) và điền thông tin của bạn:
+
+```json
+{
+  "webhooks": {
+    "discord": "https://discord.com/api/webhooks/YOUR_WEBHOOK_URL",
+    "discordBot": {
+      "token": "YOUR_DISCORD_BOT_TOKEN",
+      "channelId": "YOUR_CHANNEL_ID",
+      "guildId": "YOUR_GUILD_ID",
+      "ownerUserId": "YOUR_DISCORD_USER_ID",
+      "mentionUserId": "YOUR_DISCORD_USER_ID"
+    },
+    "telegram": {
+      "botToken": "YOUR_TELEGRAM_BOT_TOKEN",
+      "chatId": "YOUR_CHAT_ID"
+    },
+    "customUrl": ""
+  },
+  "groqApiKey": "YOUR_GROQ_API_KEY",
+  "events": {
+    "onManualIntervention": true,
+    "onTaskCompleted": true,
+    "onAutoApproved": true,
+    "onError": true
+  }
+}
+```
+
+> 💡 **Không muốn dùng kênh nào?** Có thể để trống/`""`. Bot sẽ tự bỏ qua kênh đó (ví dụ: chỉ dùng Discord thì bỏ trống `telegram.botToken` và `telegram.chatId`).
+
+---
+
+### Step 3.1: 🤖 Cấu hình Discord Bot (khuyên dùng)
+
+Để điều khiển Antigravity 2 chiều từ Discord (gửi prompt, nghe voice, nhận thông báo, bấm nút trả lời):
+
+1. **Tạo Discord Application & Bot**:
+   - Vào [Discord Developer Portal](https://discord.com/developers/applications) → **New Application** → đặt tên → **Create**.
+   - Chuyển sang tab **Bot** → **Reset Token** → **Copy** → dán vào `discordBot.token` trong `config.json`.
+2. **Bật quyền cho Bot** (trong tab **Bot** → *Privileged Gateway Intents*):
+   - ✅ **Message Content Intent** (BẮT BUỘC — để bot đọc được nội dung lệnh `!prompt`).
+3. **Mời Bot vào server** (tab **OAuth2** → **URL Generator**):
+   - Scopes: ✅ `bot`
+   - Bot Permissions: ✅ `Send Messages`, ✅ `Read Message History`, ✅ `Embed Links`, ✅ `Attach Files`, ✅ `Add Reactions`.
+   - Copy URL được tạo → mở trên trình duyệt → chọn server của bạn → **Authorize**.
+4. **Lấy các ID cần thiết**:
+   - Bật **Developer Mode** trong Discord: *User Settings → Advanced → Developer Mode*.
+   - **Channel ID** (`channelId` + `!setchannel`): Chuột phải vào kênh muốn dùng → **Copy Channel ID**.
+   - **Guild ID** (*không bắt buộc*): Chuột phải vào server → **Copy Server ID**.
+   - **Owner User ID** (`ownerUserId` + `mentionUserId`): Chuột phải vào avatar của bạn → **Copy User ID**.
+     > 🔒 `ownerUserId` là ID chủ sở hữu — chỉ tài khoản này mới chạy được các lệnh điều khiển và voice. Người khác trong server gõ lệnh sẽ bị từ chối!
+5. **(Khuyên dùng) Lấy Webhook URL** (`discord` — cho thông báo embed đẹp có nút bấm):
+   - Chuột phải vào kênh → **Edit Channel** → **Integrations** → **Webhooks** → **New Webhook** → **Copy Webhook URL** → dán vào `discord`.
+6. **(Tùy chọn) Groq API Key** (`groqApiKey` — bật nhận diện giọng nói):
+   - Vào [console.groq.com/keys](https://console.groq.com/keys) → **Create API Key** → copy → dán vào `groqApiKey`.
+   - Hoặc set trực tiếp trong Discord bằng lệnh: `!setgroq gsk_...`
+
+---
+
+### Step 3.2: 📨 Cấu hình Telegram Bot (tùy chọn)
+
+Để nhận thông báo và bấm nút trả lời trực tiếp trên Telegram:
+
+1. **Tạo Bot qua BotFather**:
+   - Mở Telegram → tìm **@BotFather** → gửi `/newbot` → đặt tên & username cho bot.
+   - BotFather trả về **HTTP API Token** (dạng `123456:ABC-DEF...`) → dán vào `telegram.botToken`.
+2. **Lấy Chat ID**:
+   - **Cách A**: Nhắn bất kỳ tin gì cho bot của bạn, sau đó mở trình duyệt truy cập:
+     `https://api.telegram.org/bot<BOT_TOKEN>/getUpdates`
+     → tìm giá trị `"chat":{"id":...}` → đó là Chat ID → dán vào `telegram.chatId`.
+   - **Cách B**: Dùng bot [@userinfobot](https://t.me/userinfobot) → nó trả về `Id` của bạn.
+   - **Cách C (Nhóm)**: Thêm bot vào nhóm → lấy Chat ID nhóm (thường bắt đầu bằng dấu `-`).
+3. Dán `telegram.botToken` và `telegram.chatId` vào `config.json`.
+
+---
+
+### Step 4: Khởi động lại & Test
+
+1. Chạy lại daemon để nạp cấu hình mới: **nhấn đúp [`run.bat`](run.bat)** (hoặc [`run-win11.bat`](run-win11.bat) để xem log trực tiếp trên Windows 11).
+2. **Khởi động lại Antigravity** bằng shortcut đã được patch (bước setup).
+3. Test trên Discord/Telegram bằng lệnh:
+   - `!status` → kiểm tra kết nối CDP & session hiện tại.
+   - `!prompt hello world` → gửi thử 1 prompt vào Antigravity.
+   - Gửi 1 tin nhắn voice note → kiểm tra nhận diện giọng nói (nếu đã bật Groq).
+
+> ✅ **Xong!** Từ giờ hệ thống sẽ **tự động cập nhật code** mỗi khi khởi động máy và **tự chạy daemon** ngầm — bạn không cần thao tác gì thêm.
+
+---
+
+### 🔄 Cập nhật phiên bản mới
+
+Bạn **không cần làm gì cả**! Mỗi lần khởi động lại máy, daemon tự động so sánh commit với GitHub và kéo bản mới nhất về.
+
+Muốn cập nhật thủ công ngay lập tức: **nhấn đúp [`update.bat`](update.bat)**.
 
 ---
 
@@ -160,32 +259,11 @@ Get alerted on Discord or Telegram whenever your AI subagents require attention,
 
 ---
 
-### Quick Setup:
+### Configuration:
 
-Copy `config.json.example` to `config.json` and configure your credentials:
+Chi tiết cách lấy Token và cấu hình `config.json` xem tại [Step 3: Cấu hình Discord & Telegram](#step-3-điền-thông-tin-discord--telegram-vào-configjson).
 
-```json
-{
-  "webhooks": {
-    "discord": "https://discord.com/api/webhooks/YOUR_WEBHOOK_URL",
-    "discordBot": {
-      "token": "YOUR_DISCORD_BOT_TOKEN",
-      "channelId": "YOUR_CHANNEL_ID",
-      "guildId": "YOUR_GUILD_ID",
-      "mentionUserId": "YOUR_DISCORD_USER_ID"
-    },
-    "telegram": {
-      "botToken": "YOUR_TELEGRAM_BOT_TOKEN",
-      "chatId": "YOUR_CHAT_ID"
-    },
-    "customUrl": ""
-  },
-  "events": {
-    "onManualIntervention": true,
-    "onTaskCompleted": true,
-    "onAutoApproved": true,
-    "onError": true
-```
+---
 
 ---
 
@@ -229,11 +307,7 @@ Manage Antigravity directly from Discord — both receive notifications AND send
 
 > **Note:** `!prompt` requires Antigravity to be open on this machine. If the IDE is closed the bot replies with a clear error so you know nothing was lost.
 
-#### How to get Discord credentials:
-1. **Bot Token**: [Discord Developer Portal](https://discord.com/developers/applications) → Your App → **Bot** → **Reset Token** → Copy.
-2. **Channel ID**: Enable Developer Mode in Discord (Settings → Advanced) → Right-click your channel → **Copy Channel ID**.
-3. **Mention User ID**: Right-click your own avatar/profile → **Copy User ID**. This ensures the bot only pings *you* when an option requires your input!
-4. **Zero Port Forwarding**: The Discord Bot uses the official Gateway WebSocket (`wss://gateway.discord.gg`), so it works everywhere behind NAT/firewalls without opening ports or using ngrok!
+> 🔗 **Hướng dẫn tạo Bot & lấy Token/ID:** Xem chi tiết tại [Step 3.1: Cấu hình Discord Bot](#step-31--cấu-hình-discord-bot-khuyên-dùng).
 
 ---
 
