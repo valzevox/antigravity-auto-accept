@@ -35,12 +35,12 @@ When building large software or letting AI agents complete autonomous multi-step
 
 - 🎯 **Native Antigravity 2.0 Multi-Choice Support**: Intelligently handles the 5-choice permission modals, automatically selects *"Yes, and always allow in this conversation/project"*, and triggers the `Submit` button.
 - 🔀 **Multi-Session Auto-Router & Seamless Background Hop**: Monitors all background conversations across your entire workspace/brain. When an agent in another session halts on a tool or permission request, the router automatically hops to that conversation, approves it, and immediately returns you back to your current active session!
-- 🔔 **Discord & Telegram Webhook Notifications**: Real-time alerts for agent task completion, manual user intervention required (e.g. subagent asking questions), auto-approval history, and errors.
+- 🎮 **Two-Way Remote Interactive Buttons (Discord & Telegram)**: Whenever your AI subagents require input (`ask_question`), the bot pings you with native clickable buttons. Simply tap the option from your mobile or desktop to submit the answer directly into Antigravity!
+- ⚡ **Zero-Port Discord Gateway WebSocket**: Connects directly via `wss://gateway.discord.gg`. Starts automatically with `run.bat` and remains active 24/7 without requiring public IPs, port forwarding, or ngrok tunnels.
+- 🔔 **Smart Multi-Tier Notifications**: Clean Antigravity-branded embeds categorized into 4 distinct events (Manual Intervention, Task Completed, Auto-Approved, Error Logs).
 - 🚀 **100% Standalone Background Daemon**: Runs silently in the background as a lightweight system service or background process without needing VS Code workbench windows.
 - 🛡️ **Dangerous Command Guard**: Built-in safety filter automatically blocks hazardous patterns (`rm -rf /`, `format c:`, `dd if=`, etc.).
 - 🔄 **Auto-Reconnection**: Resilient WebSocket layer detects when Antigravity opens or closes, instantly reconnecting within 3 seconds.
-- ⚡ **Zero Configuration Required**: Includes automated 1-click Windows shortcut patcher and startup registration.
-- 💻 **Cross-Platform & Backwards Compatible**: Supports Antigravity 2.0 standalone Electron app, Cursor, and VS Code extension environments.
 
 ---
 
@@ -140,20 +140,34 @@ run.bat
 
 ## 🔔 Webhook Notifications & Remote Action Buttons (Discord & Telegram)
 
-Get alerted on Discord or Telegram whenever your AI subagents require attention, styled with native Antigravity branding:
-- 1️⃣ **Case 1 (Manual Intervention)**: Subagent asks a question (`ask_question`). On Telegram, interactive inline buttons are attached for each option so you can tap to select and submit directly from your phone!
-- 2️⃣ **Case 2 (Task Completed)**: Subagent concluded its work turn without further tool calls.
-- 3️⃣ **Case 3 (Auto-Approved)**: Auto-accept successfully hopped and approved a permission request.
-- 4️⃣ **Case 4 (Execution Error)**: Subagent hit an error.
+Get alerted on Discord or Telegram whenever your AI subagents require attention, styled with native **Antigravity branding** (custom avatar, signature footer, and event color-coding):
+
+### Event Types:
+- 1️⃣ **Case 1 (Manual Intervention Required)**:
+  - Subagent asks an interactive question (`ask_question`).
+  - **Discord**: Automatically pings your user tag (`@username`) and attaches native **Clickable Action Buttons** (Options 1, 2, 3...) directly under the embed.
+  - **Telegram**: Attaches native **Inline Keyboard Buttons**.
+  - **Remote Action**: Tap any button on your phone or PC → Antigravity automatically hops to the session, selects your answer, and clicks `Submit`!
+- 2️⃣ **Case 2 (Task Completed)**: Subagent finishes its execution turn without further tool calls. Clean embed notification with no noisy pings.
+- 3️⃣ **Case 3 (Auto-Approved)**: Daemon auto-detects and accepts permissions in background sessions (`⚡ Auto-Approved`). Quiet notification without user mention.
+- 4️⃣ **Case 4 (Execution Error)**: Detailed error reports with runtime stack traces for troubleshooting.
+
+---
 
 ### Quick Setup:
 
-Copy `config.json.example` to `config.json`:
+Copy `config.json.example` to `config.json` and configure your credentials:
 
 ```json
 {
   "webhooks": {
     "discord": "https://discord.com/api/webhooks/YOUR_WEBHOOK_URL",
+    "discordBot": {
+      "token": "YOUR_DISCORD_BOT_TOKEN",
+      "channelId": "YOUR_CHANNEL_ID",
+      "guildId": "YOUR_GUILD_ID",
+      "mentionUserId": "YOUR_DISCORD_USER_ID"
+    },
     "telegram": {
       "botToken": "YOUR_TELEGRAM_BOT_TOKEN",
       "chatId": "YOUR_CHAT_ID"
@@ -169,7 +183,11 @@ Copy `config.json.example` to `config.json`:
 }
 ```
 
-> **Remote Button Answering (Telegram):** When you tap an option button in Telegram, the built-in bridge automatically navigates Antigravity to that conversation, selects the corresponding option, and clicks `Submit` without needing port forwarding!
+#### How to get Discord credentials:
+1. **Bot Token**: [Discord Developer Portal](https://discord.com/developers/applications) → Your App → **Bot** → **Reset Token** → Copy.
+2. **Channel ID**: Enable Developer Mode in Discord (Settings → Advanced) → Right-click your channel → **Copy Channel ID**.
+3. **Mention User ID**: Right-click your own avatar/profile → **Copy User ID**. This ensures the bot only pings *you* when an option requires your input!
+4. **Zero Port Forwarding**: The Discord Bot uses the official Gateway WebSocket (`wss://gateway.discord.gg`), so it works everywhere behind NAT/firewalls without opening ports or using ngrok!
 
 ---
 
