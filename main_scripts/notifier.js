@@ -229,16 +229,16 @@ class Notifier {
 
         const jobs = [];
 
-        // Format ping text (e.g. @here, @everyone, or <@123456>)
+        // Format ping text (e.g. @here, @everyone, or <@123456>) on Case 1 (options) and Case 2 (task completed)
         let mention = '';
-        if (code === 1 && discordBot.mentionUserId) {
+        if ((code === 1 || code === 2) && discordBot.mentionUserId) {
             const m = String(discordBot.mentionUserId).trim();
             if (m.toLowerCase() === 'here' || m === '@here') mention = '@here';
             else if (m.toLowerCase() === 'everyone' || m === '@everyone') mention = '@everyone';
             else if (m) mention = `<@${m}>`;
         }
 
-        // Discord Bot channel: full interactive support with buttons + user ping on Case 1.
+        // Discord Bot channel: full interactive support with buttons + user ping on Case 1 & Case 2.
         if (this.gateway && discordBot.token && discordBot.channelId) {
             jobs.push(this.gateway.sendMessageWithButtons(msg.embed, options, payload.session || '', mention));
         }
