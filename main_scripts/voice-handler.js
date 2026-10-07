@@ -63,12 +63,29 @@ class VoiceHandler {
         });
     }
 
+    getFfmpegPath() {
+        const candidates = [
+            'ffmpeg',
+            path.join(process.env.LOCALAPPDATA || '', 'Microsoft', 'WinGet', 'Links', 'ffmpeg.exe'),
+            'C:\\ProgramData\\chocolatey\\bin\\ffmpeg.exe',
+            'C:\\ffmpeg\\bin\\ffmpeg.exe'
+        ];
+        for (const c of candidates) {
+            try {
+                if (c === 'ffmpeg') continue;
+                if (fs.existsSync(c)) return c;
+            } catch (e) {}
+        }
+        return 'ffmpeg';
+    }
+
     /**
      * Convert any audio (ogg, opus, mp4, etc.) to 16kHz mono mp3 or wav using ffmpeg
      */
     async convertAudioToMp3(inputPath, outputPath) {
         return new Promise((resolve, reject) => {
-            const ff = spawn('ffmpeg', [
+            const ffmpegBin = this.getFfmpegPath();
+            const ff = spawn(ffmpegBin, [
                 '-y',
                 '-i', inputPath,
                 '-vn',
@@ -165,9 +182,18 @@ class VoiceHandler {
 
         try {
             await this.downloadAudio(attachment.url, rawFile);
-            // Convert to clean standard mp3 for whisper
-            await this.convertAudioToMp3(rawFile, mp3File);
-            const text = await this.transcribe(mp3File);
+            
+            let fileToTranscribe = rawFile;
+            try {
+                // Attempt standard conversion to 16kHz mono mp3
+                await this.convertAudioToMp3(rawFile, mp3File);
+                if (fs.existsSync(mp3File)) fileToTranscribe = mp3File;
+            } catch (convErr) {
+                this.log(`FFmpeg conversion skipped/failed (${convErr.message}), uploading raw audio directly...`);
+                fileToTranscribe = rawFile;
+            }
+
+            const text = await this.transcribe(fileToTranscribe);
             return text;
         } finally {
             // Cleanup temp files
