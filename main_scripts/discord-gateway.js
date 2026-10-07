@@ -9,6 +9,7 @@
 const https = require('https');
 const WebSocket = require('ws');
 const { BRAND, EVENT_META } = require('./notifier');
+const { DiscordCommandHandler } = require('./discord-commands');
 
 class DiscordGatewayBridge {
     constructor(router, config = {}, log = () => {}) {
@@ -18,6 +19,7 @@ class DiscordGatewayBridge {
         this.guildId = config.guildId || '';
         this.log = log;
 
+        this.commandHandler = new DiscordCommandHandler(this, router, log);
         this.ws = null;
         this.heartbeatTimer = null;
         this.sequence = null;
@@ -91,12 +93,12 @@ class DiscordGatewayBridge {
                     this.send({ op: 1, d: this.sequence });
                 }, interval);
 
-                // Identify (Intents: Guilds = 1)
+                // Identify (Intents: Guilds = 1, GuildMessages = 512, MessageContent = 32768)
                 this.send({
                     op: 2,
                     d: {
                         token: this.token,
-                        intents: 1 | 512, // GUILDS | GUILD_MESSAGES
+                        intents: 1 | 512 | 32768,
                         properties: {
                             os: process.platform,
                             browser: 'Antigravity-Agent',
@@ -115,6 +117,8 @@ class DiscordGatewayBridge {
                     this.log(`[DiscordGateway] Ready! Logged in as ${d.user.username}#${d.user.discriminator}`);
                 } else if (t === 'INTERACTION_CREATE') {
                     await this.handleInteraction(d);
+                } else if (t === 'MESSAGE_CREATE') {
+                    await this.commandHandler.handleMessage(d);
                 }
                 break;
         }
@@ -239,6 +243,63 @@ class DiscordGatewayBridge {
             });
             req.on('error', () => resolve(false));
             req.write(data);
+            req.end();
+        });
+    }
+
+    /**
+     * Send plain text or embed to any Discord channel
+     */
+    async sendChannelMessage(channelId, content = '', embed = null) {
+        if (!channelId || !this.token) return false;
+        const payload = {};
+        if (content) payload.content = content;
+        if (embed) payload.embeds = [embed];
+
+        const data = JSON.stringify(payload);
+        return new Promise((resolve) => {
+            const req = https.request(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bot ${this.token}`,
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(data)
+                }
+            }, (res) => {
+                res.on('data', () => {});
+                res.on('end', () => resolve(res.statusCode >= 200 && res.statusCode < 300));
+            });
+            req.on('error', () => resolve(false));
+            req.write(data);
+            req.end();
+        });
+    }
+
+    /**
+     * Fetch list of channels from current Guild
+     */
+    async fetchGuildChannels() {
+        if (!this.guildId || !this.token) return [];
+        return new Promise((resolve) => {
+            const req = https.request(`https://discord.com/api/v10/guilds/${this.guildId}/channels`, {
+                method: 'GET',
+                headers: {
+                    Authorization: `Bot ${this.token}`,
+                    'Content-Type': 'application/json'
+                }
+            }, (res) => {
+                let body = '';
+                res.on('data', (c) => body += c);
+                res.on('end', () => {
+                    try {
+                        const channels = JSON.parse(body);
+                        resolve(Array.isArray(channels) ? channels : []);
+                    } catch {
+                        resolve([]);
+                    }
+                });
+            });
+            req.on('error', () => resolve([]));
             req.end();
         });
     }

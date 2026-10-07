@@ -179,9 +179,23 @@ Copy `config.json.example` to `config.json` and configure your credentials:
     "onTaskCompleted": true,
     "onAutoApproved": true,
     "onError": true
-  }
-}
 ```
+
+---
+
+### Remote In-Chat Discord Management:
+
+You can manage bot settings and monitor Antigravity directly inside your Discord server using text commands:
+
+| Command | Description | Example |
+|---|---|---|
+| `!status` | Check Antigravity CDP connection & active session | `!status` |
+| `!config` | View active notification channel & ping settings | `!config` |
+| `!setchannel <#channel \| id>` | Change notification & prompt channel live | `!setchannel #agent-logs` |
+| `!setping <target>` | Change who gets pinged on option prompts (`@user`, `here`, `everyone`, `off`) | `!setping here` or `!setping @valzevox` |
+| `!channels` | List server text channels with IDs for easy selection | `!channels` |
+| `!help` | Show command help in an interactive embed | `!help` |
+
 
 #### How to get Discord credentials:
 1. **Bot Token**: [Discord Developer Portal](https://discord.com/developers/applications) → Your App → **Bot** → **Reset Token** → Copy.
