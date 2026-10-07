@@ -168,6 +168,9 @@ class MultiSessionRouter {
                         session: id,
                         summary: content
                     });
+                    if (this.loadingWatcher) {
+                        this.loadingWatcher.finishSession(id, content, false);
+                    }
                 }
                 continue;
             }
@@ -214,6 +217,9 @@ class MultiSessionRouter {
                 session: sid,
                 summary: `Tự động phê duyệt quyền (Always Allow) thành công cho phiên \`${sid}\``
             });
+            if (this.loadingWatcher) {
+                this.loadingWatcher.recordApproval(sid, 'Luôn cho phép (Always Allow)', 'Phê duyệt công cụ/lệnh');
+            }
             await sleep(SETTLE_BACK_MS);
         }
 
@@ -431,10 +437,16 @@ class MultiSessionRouter {
 
             // Get session info for response
             const info = await this.getSessions();
+            const activeSession = info.sessions.find(s => s.active) || { id: info.currentId, title: info.currentTitle };
+
+            if (this.loadingWatcher && activeSession.id) {
+                // Trigger live loading progress card immediately on Discord
+                this.loadingWatcher.trackSession(activeSession.id, activeSession.title);
+            }
 
             return {
                 ok: true,
-                session: info.sessions.find(s => s.active) || { id: info.currentId, title: info.currentTitle },
+                session: activeSession,
                 method: clickRes && clickRes.clicked ? clickRes.method : 'cdp-enter'
             };
         } catch (err) {

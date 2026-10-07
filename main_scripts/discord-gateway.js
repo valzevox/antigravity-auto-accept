@@ -248,14 +248,10 @@ class DiscordGatewayBridge {
     }
 
     /**
-     * Send plain text or embed to any Discord channel
+     * Create a message and return the created message object (with ID)
      */
-    async sendChannelMessage(channelId, content = '', embed = null) {
-        if (!channelId || !this.token) return false;
-        const payload = {};
-        if (content) payload.content = content;
-        if (embed) payload.embeds = [embed];
-
+    async createRawMessage(channelId, payload) {
+        if (!channelId || !this.token) return null;
         const data = JSON.stringify(payload);
         return new Promise((resolve) => {
             const req = https.request(`https://discord.com/api/v10/channels/${channelId}/messages`, {
@@ -266,13 +262,80 @@ class DiscordGatewayBridge {
                     'Content-Length': Buffer.byteLength(data)
                 }
             }, (res) => {
-                res.on('data', () => {});
+                let body = '';
+                res.on('data', (c) => body += c);
+                res.on('end', () => {
+                    try {
+                        if (res.statusCode >= 200 && res.statusCode < 300) {
+                            resolve(JSON.parse(body));
+                        } else {
+                            resolve(null);
+                        }
+                    } catch (e) {
+                        resolve(null);
+                    }
+                });
+            });
+            req.on('error', () => resolve(null));
+            req.write(data);
+            req.end();
+        });
+    }
+
+    /**
+     * Edit an existing message in a Discord channel
+     */
+    async editMessage(channelId, messageId, payload) {
+        if (!channelId || !messageId || !this.token) return false;
+        const data = JSON.stringify(payload);
+        return new Promise((resolve) => {
+            const req = https.request(`https://discord.com/api/v10/channels/${channelId}/messages/${messageId}`, {
+                method: 'PATCH',
+                headers: {
+                    Authorization: `Bot ${this.token}`,
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(data)
+                }
+            }, (res) => {
+                let body = '';
+                res.on('data', (c) => body += c);
                 res.on('end', () => resolve(res.statusCode >= 200 && res.statusCode < 300));
             });
             req.on('error', () => resolve(false));
             req.write(data);
             req.end();
         });
+    }
+
+    /**
+     * Delete a message in a Discord channel
+     */
+    async deleteMessage(channelId, messageId) {
+        if (!channelId || !messageId || !this.token) return false;
+        return new Promise((resolve) => {
+            const req = https.request(`https://discord.com/api/v10/channels/${channelId}/messages/${messageId}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bot ${this.token}` }
+            }, (res) => {
+                res.on('data', () => {});
+                res.on('end', () => resolve(res.statusCode >= 200 && res.statusCode < 300));
+            });
+            req.on('error', () => resolve(false));
+            req.end();
+        });
+    }
+
+    /**
+     * Send plain text or embed to any Discord channel
+     */
+    async sendChannelMessage(channelId, content = '', embed = null) {
+        if (!channelId || !this.token) return false;
+        const payload = {};
+        if (content) payload.content = content;
+        if (embed) payload.embeds = [embed];
+
+        const res = await this.createRawMessage(channelId, payload);
+        return !!res;
     }
 
     /**

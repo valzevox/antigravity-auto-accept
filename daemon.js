@@ -52,7 +52,10 @@ function checkCdpPort(port) {
 const { MultiSessionRouter } = require('./main_scripts/multi-session');
 const { TelegramAnswerBridge } = require('./main_scripts/telegram-bridge');
 const { DiscordGatewayBridge } = require('./main_scripts/discord-gateway');
+const { LoadingWatcher } = require('./main_scripts/loading-watcher');
 const router = new MultiSessionRouter(handler, { log });
+const loadingWatcher = new LoadingWatcher(router, { log });
+router.loadingWatcher = loadingWatcher;
 
 let bridge = null;
 const tgToken = router.notifier.config.webhooks.telegram.botToken;
@@ -89,12 +92,14 @@ async function loop() {
                 log('[AutoAccept Daemon] Successfully connected to Antigravity 2.0 via CDP!');
                 isConnected = true;
                 router.start();
+                loadingWatcher.start();
             }
         } else {
             if (isConnected) {
                 log('[AutoAccept Daemon] Antigravity disconnected or closed. Waiting for Antigravity...');
                 isConnected = false;
                 router.stop();
+                loadingWatcher.stop();
                 await handler.stop();
             }
         }
