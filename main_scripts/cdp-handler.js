@@ -470,7 +470,8 @@ class CDPHandler {
         return this._send(id, 'Runtime.evaluate', {
             expression,
             userGesture: true,
-            awaitPromise: true
+            awaitPromise: true,
+            returnByValue: true
         }, sessionId);
     }
 

@@ -141,6 +141,33 @@ class LoadingWatcher {
     }
 
     /**
+     * Find most recently active session on disk if CDP is not focused on it
+     */
+    findRecentlyActiveSession() {
+        try {
+            const ids = fs.readdirSync(this.brainDir);
+            let latest = null;
+            let latestMtime = 0;
+            const now = Date.now();
+
+            for (const id of ids) {
+                const file = path.join(this.brainDir, id, '.system_generated', 'logs', 'transcript.jsonl');
+                if (!fs.existsSync(file)) continue;
+                try {
+                    const mtime = fs.statSync(file).mtimeMs;
+                    if (now - mtime < 15000 && mtime > latestMtime) {
+                        latestMtime = mtime;
+                        latest = { id, mtimeMs: mtime };
+                    }
+                } catch (e) {}
+            }
+            return latest;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /**
      * Parse recent steps from transcript.jsonl
      */
     readLiveTranscript(sessionId) {
@@ -150,7 +177,7 @@ class LoadingWatcher {
         let content = '';
         try {
             const stat = fs.statSync(file);
-            const readBytes = Math.min(stat.size, 64 * 1024); // read last 64KB
+            const readBytes = Math.min(stat.size, 96 * 1024); // read last 96KB
             const fd = fs.openSync(file, 'r');
             const buf = Buffer.alloc(readBytes);
             fs.readSync(fd, buf, 0, readBytes, stat.size - readBytes);
@@ -165,13 +192,18 @@ class LoadingWatcher {
         let currentAction = '';
         let activeSubagents = [];
         let lastStepIndex = 0;
-        let isDone = false;
+        let lastResponseText = '';
 
         for (let i = lines.length - 1; i >= 0; i--) {
             try {
                 const record = JSON.parse(lines[i]);
                 if (!lastStepIndex && record.step_index) {
                     lastStepIndex = record.step_index;
+                }
+
+                // Check final/recent text content
+                if (!lastResponseText && record.type === 'PLANNER_RESPONSE' && record.content && (!record.tool_calls || record.tool_calls.length === 0)) {
+                    lastResponseText = record.content;
                 }
 
                 // Check tool calls
@@ -200,12 +232,11 @@ class LoadingWatcher {
                         .map(l => l.trim())
                         .filter(l => l && !l.startsWith('CRITICAL') && !l.startsWith('...') && l.length > 5);
                     if (thoughtLines.length > 0) {
-                        // Take the most descriptive recent thought line
                         lastThought = thoughtLines[thoughtLines.length - 1].replace(/^m:\s*/i, '');
                     }
                 }
 
-                if (lastThought && currentAction) break;
+                if (lastThought && currentAction && lastResponseText) break;
             } catch (e) {}
         }
 
@@ -213,7 +244,8 @@ class LoadingWatcher {
             lastThought: lastThought || 'Đang phân tích và xử lý mã nguồn...',
             currentAction: currentAction || 'Đang thực thi tác vụ...',
             subagents: activeSubagents,
-            lastStepIndex
+            lastStepIndex,
+            lastResponseText
         };
     }
 
@@ -269,26 +301,62 @@ class LoadingWatcher {
         const gateway = this.router.notifier?.gateway;
         if (!gateway) return;
 
-        // Auto-detect active running session if not explicitly registered
+        // 1. Auto-detect active running session if none is currently tracked
         if (this.activeSessions.size === 0) {
             try {
-                const cur = await this.router.getSessions();
-                if (cur && cur.currentId) {
-                    // Check if page has cancel button (currently generating)
-                    for (const [targetId] of this.router.handler.connections) {
-                        const isGen = await this.router.evalPage(targetId, '!!document.querySelector(\'[data-tooltip-id*="cancel-tooltip"], button[aria-label*="Cancel"]\')');
-                        if (isGen) {
-                            await this.trackSession(cur.currentId, cur.currentTitle);
-                            break;
-                        }
+                let isGenerating = false;
+                let activeId = null;
+                let activeTitle = null;
+
+                // Priority A: Check CDP for Cancel/Stop button
+                for (const [targetId] of this.router.handler.connections) {
+                    const status = await this.router.evalPage(targetId, `(() => {
+                        const hasCancel = !!document.querySelector('[data-tooltip-id*="cancel-tooltip"], button[aria-label*="Cancel"], button[aria-label*="Stop"]');
+                        const pathname = window.location.pathname || '';
+                        const id = pathname.replace('/c/', '').split('?')[0];
+                        return { hasCancel, id, title: document.title };
+                    })()`);
+                    if (status && status.hasCancel && status.id) {
+                        isGenerating = true;
+                        activeId = status.id;
+                        activeTitle = status.title;
+                        break;
                     }
+                }
+
+                // Priority B: Fallback check on disk (transcript modified in last 5s)
+                if (!isGenerating) {
+                    const recent = this.findRecentlyActiveSession();
+                    if (recent) {
+                        isGenerating = true;
+                        activeId = recent.id;
+                    }
+                }
+
+                if (isGenerating && activeId) {
+                    if (!activeTitle) {
+                        const cur = await this.router.getSessions();
+                        activeTitle = cur?.sessions?.find(s => s.id === activeId)?.title || cur?.currentTitle || `Session ${activeId.slice(0, 8)}`;
+                    }
+                    await this.trackSession(activeId, activeTitle);
                 }
             } catch (e) {}
         }
 
-        // Update all active sessions
+        // 2. Update and lifecycle-manage all tracked active sessions
         for (const [sessionId, state] of this.activeSessions.entries()) {
             if (state.isCompleted) continue;
+
+            // Retry initial message if previous call failed
+            if (!state.messageId && state.channelId) {
+                try {
+                    const embed = this.buildLoadingEmbed(state);
+                    const msg = await gateway.createRawMessage(state.channelId, { embeds: [embed] });
+                    if (msg && msg.id) {
+                        state.messageId = msg.id;
+                    }
+                } catch (e) {}
+            }
 
             const live = this.readLiveTranscript(sessionId);
             if (live) {
@@ -298,6 +366,41 @@ class LoadingWatcher {
                 state.lastStepIndex = live.lastStepIndex;
             }
 
+            // Check if session has finished generating
+            let stillGenerating = false;
+            for (const [targetId] of this.router.handler.connections) {
+                const isGen = await this.router.evalPage(targetId, `(() => {
+                    const hasCancel = !!document.querySelector('[data-tooltip-id*="cancel-tooltip"], button[aria-label*="Cancel"], button[aria-label*="Stop"]');
+                    const pathname = window.location.pathname || '';
+                    const id = pathname.replace('/c/', '').split('?')[0];
+                    return hasCancel && (id === ${JSON.stringify(sessionId)} || !id);
+                })()`);
+                if (isGen) {
+                    stillGenerating = true;
+                    break;
+                }
+            }
+
+            if (!stillGenerating) {
+                const transFile = path.join(this.brainDir, sessionId, '.system_generated', 'logs', 'transcript.jsonl');
+                if (fs.existsSync(transFile)) {
+                    try {
+                        const mtime = fs.statSync(transFile).mtimeMs;
+                        if (Date.now() - mtime < 4000) {
+                            stillGenerating = true;
+                        }
+                    } catch (e) {}
+                }
+            }
+
+            // Turn completed: auto-finish session card
+            if (!stillGenerating && (Date.now() - state.startTime > 3000)) {
+                const summary = live?.lastResponseText || '';
+                await this.finishSession(sessionId, summary, false);
+                continue;
+            }
+
+            // Update live card embed
             if (state.messageId && state.channelId) {
                 const embed = this.buildLoadingEmbed(state);
                 try {
