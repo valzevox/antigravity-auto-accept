@@ -40,6 +40,8 @@ async function run() {
     };
 
     const handler = new DiscordCommandHandler(mockGateway, mockRouter);
+    handler.loadConfig = () => mockRouter.notifier.config;
+    handler.saveConfig = (cfg) => { mockRouter.notifier.config = cfg; return true; };
 
     // Test 1: !help
     sentMessages = [];
@@ -173,6 +175,32 @@ async function run() {
     assert.ok(sentMessages.length >= 3);
     assert.ok(sentMessages[1].content.includes('Thực thi: Danh sách Session'));
     assert.strictEqual(sentMessages[2].embed.title, '📂 Danh sách Sessions trong Antigravity');
+
+    // Test 17: Unauthorized user trying to run !stop
+    sentMessages.length = 0;
+    handler.loadConfig = () => ({
+        webhooks: { discordBot: { mentionUserId: '999999999999999999' } }
+    });
+    await handler.handleMessage({
+        author: { id: '111111111111111111', username: 'attacker' },
+        channel_id: 'chan-1',
+        content: '!stop'
+    });
+    assert.strictEqual(sentMessages.length, 1);
+    assert.ok(sentMessages[0].content.includes('yêu cầu quyền chủ sở hữu'));
+
+    // Test 18: Unauthorized user sending voice attachment
+    sentMessages.length = 0;
+    await handler.handleMessage({
+        author: { id: '111111111111111111', username: 'attacker' },
+        channel_id: 'chan-1',
+        attachments: [{
+            url: 'https://cdn.discord.com/fake.ogg',
+            content_type: 'audio/ogg'
+        }]
+    });
+    assert.strictEqual(sentMessages.length, 1);
+    assert.ok(sentMessages[0].content.includes('Bạn không có quyền điều khiển'));
 
     console.log('DiscordCommandHandler self-check: PASS');
 }

@@ -5,6 +5,7 @@
       "token": "YOUR_DISCORD_BOT_TOKEN",
       "channelId": "YOUR_CHANNEL_ID",
       "guildId": "YOUR_GUILD_ID",
+      "ownerUserId": "YOUR_DISCORD_USER_ID",
       "mentionUserId": "YOUR_DISCORD_USER_ID"
     },
     "telegram": {

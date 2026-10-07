@@ -40,6 +40,22 @@ class DiscordCommandHandler {
         }
     }
 
+    /**
+     * Owner-only authorization gate.
+     * Owner ID lives in webhooks.discordBot.ownerUserId — a dedicated key that no
+     * command overwrites (unlike mentionUserId, which !setping rewrites).
+     * Falls back to mentionUserId for backward compatibility.
+     * If neither is configured, runs in open mode so fresh installs still work.
+     * `!help` stays public.
+     */
+    isAuthorized(message) {
+        const cfg = this.loadConfig();
+        const bot = cfg.webhooks?.discordBot || {};
+        const ownerId = bot.ownerUserId || bot.mentionUserId;
+        if (!ownerId || ownerId === 'here' || ownerId === 'everyone') return true;
+        return String(message.author?.id || '') === String(ownerId);
+    }
+
     async handleMessage(message) {
         if (!message || message.author?.bot) return;
 
@@ -54,6 +70,10 @@ class DiscordCommandHandler {
         });
 
         if (audioAttachment) {
+            if (!this.isAuthorized(message)) {
+                await this.reply(message.channel_id, `🔒 <@${message.author.id}> Bạn không có quyền điều khiển Antigravity bằng voice. Chỉ chủ sở hữu mới được sử dụng.`);
+                return;
+            }
             await this.handleVoiceMessage(message, audioAttachment);
             return;
         }
@@ -64,6 +84,13 @@ class DiscordCommandHandler {
         const parts = content.slice(1).trim().split(/\s+/);
         const cmd = parts[0]?.toLowerCase();
         const args = parts.slice(1);
+
+        // Owner-only gate: allow !help for everyone, everything else requires owner
+        if (cmd !== 'help' && cmd !== 'commands' && !this.isAuthorized(message)) {
+            this.log(`[DiscordCommands] Denied @${message.author?.username} (${message.author?.id}) tried: !${cmd}`);
+            await this.reply(message.channel_id, `🔒 <@${message.author.id}> Lệnh \`!${cmd}\` yêu cầu quyền chủ sở hữu. Chỉ tài khoản được cấp quyền mới được sử dụng các lệnh điều khiển.`);
+            return;
+        }
 
         switch (cmd) {
             case 'help':
@@ -107,6 +134,10 @@ class DiscordCommandHandler {
             case 'setgroq':
             case 'groq':
                 await this.cmdSetGroq(message, args[0]);
+                break;
+            case 'setowner':
+            case 'owner':
+                await this.cmdSetOwner(message, args);
                 break;
             case 'channels':
             case 'listchannels':
@@ -469,6 +500,30 @@ class DiscordCommandHandler {
                 this.router.notifier.config.webhooks.discordBot.mentionUserId = target;
             }
             await this.reply(message.channel_id, `✅ **Cập nhật chế độ ping thành công!**\n👉 ${display}`);
+        } else {
+            await this.reply(message.channel_id, '❌ Lỗi lưu cấu hình vào `config.json`!');
+        }
+    }
+
+    async cmdSetOwner(message, args) {
+        const raw = args[0];
+        if (!raw) {
+            return this.reply(message.channel_id, '❌ Cách dùng: `!setowner <@user hoặc User_ID>`\nVí dụ: `!setowner @valzevox` hoặc `!setowner 710045911371350117`');
+        }
+
+        const match = raw.match(/\d+/);
+        if (!match) {
+            return this.reply(message.channel_id, `❌ Không tìm thấy User ID hợp lệ trong: \`${raw}\``);
+        }
+        const targetUserId = match[0];
+
+        const cfg = this.loadConfig();
+        if (!cfg.webhooks) cfg.webhooks = {};
+        if (!cfg.webhooks.discordBot) cfg.webhooks.discordBot = {};
+        cfg.webhooks.discordBot.ownerUserId = targetUserId;
+
+        if (this.saveConfig(cfg)) {
+            await this.reply(message.channel_id, `👑 **Đã cấp quyền chủ sở hữu duy nhất cho:** <@${targetUserId}> (\`${targetUserId}\`)\n🔒 Từ bây giờ chỉ tài khoản này mới có thể dùng các lệnh điều khiển Antigravity.`);
         } else {
             await this.reply(message.channel_id, '❌ Lỗi lưu cấu hình vào `config.json`!');
         }
