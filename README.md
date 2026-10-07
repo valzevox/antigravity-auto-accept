@@ -77,41 +77,64 @@ When building large software or letting AI agents complete autonomous multi-step
 
 ## 🚀 Quick Start Guide
 
-> **👉 Chỉ cần chạy DUY NHẤT 1 file cho lần setup đầu tiên: [`setup.bat`](#step-2-chạy-file-setupbat-duy-nhất)**
-> Sau khi setup xong, mọi thứ (auto-update + auto-start khi khởi động máy) sẽ tự động diễn ra. Bạn không cần chạy lại bất cứ file nào nữa!
+> ⚡ **Cài đặt 1 dòng lệnh duy nhất (giống Free Claude Code):**  
+> Toàn bộ quá trình cài đặt, vá cổng 9000, nhập credentials, và đăng ký tự khởi động khi reset máy được gói gọn trong một script PowerShell duy nhất!
 
-### Prerequisites
-- [Node.js](https://nodejs.org) >= 18.x
-- [Git](https://git-scm.com/) (để bật tính năng tự động cập nhật)
-- Antigravity 2.0 (or Cursor / VS Code)
+### Cách 1: Cài đặt trực tiếp qua PowerShell (Khuyên dùng)
 
----
+Mở PowerShell trên máy tính của bạn và dán lệnh sau:
 
-### Step 1: Clone the repository
-
-```bash
-git clone https://github.com/valzevox/antigravity-auto-accept.git
-cd antigravity-auto-accept
+```powershell
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/valzevox/antigravity-auto-accept/main/scripts/install.ps1")))
 ```
 
 ---
 
-### Step 2: Chạy file `setup.bat` (duy nhất)
+### Cách 2: Clone repository & chạy installer
 
-**Nhấn đúp chuột vào [`setup.bat`](setup.bat)** (hoặc chuột phải → *Run as Administrator*).
-
-Đây là **file DUY NHẤT** bạn cần chạy cho lần cài đặt đầu tiên. Script sẽ tự động:
-
-1. ✅ Kiểm tra Node.js đã cài chưa
-2. ✅ Tạo file `config.json` từ template `config.json.example` (nếu chưa có)
-3. ✅ Cài đặt toàn bộ npm dependencies
-4. ✅ Vá tất cả shortcut Antigravity Desktop & Start Menu với `--remote-debugging-port=9000`
-- ✅ Đăng ký Windows Scheduled Task để daemon tự chạy khi khởi động máy
-- ✅ Chạy daemon ngầm ngay lập tức
+```bash
+git clone https://github.com/valzevox/antigravity-auto-accept.git
+cd antigravity-auto-accept
+powershell -ExecutionPolicy Bypass -File scripts\install.ps1
+```
 
 ---
 
-### Step 3: Điền thông tin Discord / Telegram vào `config.json`
+### 🛠️ Script Installer (`install.ps1`) sẽ tự động làm gì?
+
+1. ✅ **Kiểm tra môi trường:** Tự động phát hiện Node.js (>= 18.x) và Git.
+2. ✅ **Cài đặt thư viện:** Chạy `npm install --omit=dev` sạch sẽ.
+3. ✅ **Tự động cấu hình cổng (Port 9000):** Tự quét toàn bộ Desktop và Start Menu để thêm cờ `--remote-debugging-port=9000` vào shortcut Antigravity.
+4. ✅ **Trình nhập Credentials tương tác:** Cho phép bạn dán ngay Discord Bot Token, Channel ID, Owner ID, Groq API Key vào cửa sổ console (nhấn Enter để bỏ qua nếu chưa có).
+5. ✅ **Đăng ký tự khởi động (Windows Task Scheduler):** Đăng ký tác vụ hệ thống `AntigravityAutoAccept` kích hoạt khi bạn đăng nhập Windows (`-AtLogOn`).
+6. ✅ **Kích hoạt ngay:** Khởi chạy daemon lập tức.
+
+---
+
+### 🔄 Cơ chế tự động khi khởi động lại máy tính (Reboot)
+
+Khi máy tính của bạn khởi động lại:
+- Task Scheduler sẽ tự động chạy: **`update.bat` ➔ `run.bat`**.
+- **`update.bat`**: Kiểm tra GitHub xem bạn có commit mới không, nếu có thì tự kéo về (`git pull`) và cài thêm gói (`npm install`) trong 1-2 giây.
+- **`run.bat`**: Khởi động daemon phục vụ bạn ngay lập tức.
+- Bạn **KHÔNG** cần phải chạy lại `install.ps1` hay thao tác gì thêm!
+
+---
+
+### 📋 Command Reference
+
+Ở thư mục gốc dự án chỉ giữ lại các file thiết yếu:
+
+| Command | Mô tả |
+| :--- | :--- |
+| `run.bat` | Khởi chạy daemon với cửa sổ Console trực quan (tương thích Windows 10 & 11) |
+| `update.bat` | Kiểm tra cập nhật GitHub thủ công ngay lập tức |
+| `status.bat` | Kiểm tra xem daemon có đang chạy và CDP port 9000 có hoạt động không |
+| `powershell -File scripts\install.ps1` | Chạy lại trình cài đặt hoặc cập nhật credentials bất cứ lúc nào |
+
+---
+
+### Step 3: Hướng dẫn cấu hình chi tiết (Discord & Telegram)
 
 Mở file **`config.json`** (được tạo tự động ở Bước 2) và điền thông tin của bạn:
 

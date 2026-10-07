@@ -1,6 +1,6 @@
 $baseDir = Split-Path -Parent $PSScriptRoot
-$bootstrapPath = Join-Path $baseDir "bootstrap.bat"
-$action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$bootstrapPath`"" -WorkingDirectory $baseDir
+$action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"cd /d `"$baseDir`" && update.bat && run.bat --background`"" -WorkingDirectory $baseDir
 $trigger = New-ScheduledTaskTrigger -AtLogOn
-Register-ScheduledTask -TaskName "AntigravityAutoAccept" -Action $action -Trigger $trigger -Force
-Start-ScheduledTask -TaskName "AntigravityAutoAccept"
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Days 0)
+Register-ScheduledTask -TaskName "AntigravityAutoAccept" -Action $action -Trigger $trigger -Settings $settings -Force >$null 2>&1
+Start-ScheduledTask -TaskName "AntigravityAutoAccept" >$null 2>&1

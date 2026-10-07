@@ -1,22 +1,15 @@
 @echo off
+title Antigravity Auto Accept
 cd /d "%~dp0"
 
-:: Auto-update check: pull latest updates from GitHub if git is present
-where git >nul 2>&1
-if %errorlevel% equ 0 (
-    git fetch origin main >nul 2>&1
-    for /f "tokens=*" %%a in ('git rev-parse HEAD 2^>nul') do set "L_HASH=%%a"
-    for /f "tokens=*" %%a in ('git rev-parse origin/main 2^>nul') do set "R_HASH=%%a"
-    if not "%L_HASH%"=="" if not "%R_HASH%"=="" if not "%L_HASH%"=="%R_HASH%" (
-        echo [AutoAccept] New update detected! Pulling latest version...
-        git pull origin main >nul 2>&1
-    )
-)
-
-:: Terminate any existing daemon instance
+:: Terminate any existing daemon instances
 powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"name='node.exe'\" | Where-Object { $_.CommandLine -like '*daemon.js*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" >nul 2>&1
 
-:: Start Scheduled Task or launch detached
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\register-task.ps1" >nul 2>&1
+:: If called with --background (e.g. from headless tasks), run detached
+if /i "%~1"=="--background" (
+    start "" /b node daemon.js
+    exit /b 0
+)
 
-echo [AutoAccept] Background daemon is active.
+:: Visible console window for both Windows 10 & 11
+start "Antigravity Auto Accept (Console)" cmd /k "title Antigravity Auto Accept Console && node daemon.js"

@@ -22,7 +22,8 @@ class DiscordCommandHandler {
     loadConfig() {
         try {
             if (fs.existsSync(CONFIG_PATH)) {
-                return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+                const raw = fs.readFileSync(CONFIG_PATH, 'utf-8').replace(/^\uFEFF/, '');
+                return JSON.parse(raw);
             }
         } catch (e) {
             this.log(`[DiscordCommands] Failed to read config: ${e.message}`);

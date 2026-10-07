@@ -63,7 +63,8 @@ class Notifier {
         let fileConfig = {};
         if (fs.existsSync(configFile)) {
             try {
-                fileConfig = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+                const raw = fs.readFileSync(configFile, 'utf8').replace(/^\uFEFF/, '');
+                fileConfig = JSON.parse(raw);
             } catch (e) {}
         }
 
