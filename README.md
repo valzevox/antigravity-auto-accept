@@ -204,11 +204,16 @@ Manage Antigravity directly from Discord — both receive notifications AND send
 | `!channels` | List server text channels with IDs for easy selection | `!channels` |
 | `!help` | Show command help in an interactive embed | `!help` |
 
-> **🎙️ Voice-to-Prompt Support:**
+> **🎙️ Voice-to-Prompt & Voice Control:**
 > Send an audio file or record a Discord voice note into the bot channel! The bot automatically:
-> 1. Converts audio via FFmpeg to 16kHz mono MP3.
-> 2. Transcribes with Groq Whisper (`whisper-large-v3-turbo`) in ~300ms.
-> 3. Dispatches the text prompt directly into Antigravity via CDP and presses Enter!
+> 1. Converts audio via FFmpeg (or direct upload) and transcribes with Groq Whisper (`whisper-large-v3-turbo`) in ~300ms.
+> 2. **Phân tích khẩu lệnh (Voice Commands):**
+>    - *"Danh sách session"* / *"Xem các phiên"* ➡️ Tự động liệt kê các sessions đang mở.
+>    - *"Chuyển sang session <tên hoặc ID>"* ➡️ Tự động chuyển tab Antigravity sang phiên đó.
+>    - *"Dừng lại"* / *"Hủy task"* ➡️ Dừng tác vụ đang chạy.
+>    - *"Trạng thái"* / *"Status"* ➡️ Kiểm tra tình trạng kết nối.
+>    - *"Phiên mới: <prompt>"* ➡️ Mở phiên làm việc mới và nạp prompt.
+>    - *Mọi câu nói thông thường khác* ➡️ Tự động nạp thành Prompt vào phiên hiện tại và nhấn Enter!
 
 > **Note:** `!prompt` requires Antigravity to be open on this machine. If the IDE is closed the bot replies with a clear error so you know nothing was lost.
 

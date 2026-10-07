@@ -115,6 +115,47 @@ class DiscordCommandHandler {
         }
     }
 
+    parseVoiceIntent(text) {
+        if (!text) return { intent: 'prompt', prompt: '' };
+        const clean = text.trim().toLowerCase().replace(/[.,!?;:]+$/, '');
+
+        // 1. List / Xem sessions
+        if (/^(?:danh sách|list|xem|hiện|hiển thị|các)\s*(?:tất cả\s*)?(?:các\s*)?(?:session|phiên|cuộc trò chuyện|chat)/i.test(clean) ||
+            /^(?:sessions|list sessions|list session)$/i.test(clean)) {
+            return { intent: 'sessions' };
+        }
+
+        // 2. Chuyển session / Switch session
+        const switchMatch = clean.match(/^(?:chuyển|switch|đổi|mở|go to|nhảy sang|nhảy qua)\s*(?:sang|đến|vào)?\s*(?:session|phiên)?\s*(.+)$/i);
+        if (switchMatch && switchMatch[1] && switchMatch[1].trim()) {
+            return { intent: 'switch', target: switchMatch[1].trim() };
+        }
+
+        // 3. Dừng task / Stop
+        if (/^(dừng|dừng lại|hủy|stop|cancel|ngừng)(?:\s*(?:lại|task|nhiệm vụ|tiến trình))?$/i.test(clean)) {
+            return { intent: 'stop' };
+        }
+
+        // 4. Trạng thái / Status
+        if (/^(trạng thái|kiểm tra|status|check)$/i.test(clean)) {
+            return { intent: 'status' };
+        }
+
+        // 5. Phiên mới + Prompt
+        const newMatch = clean.match(/^(?:tạo|mở|bắt đầu)?\s*(?:session|phiên|chat)?\s*mới\s*[:,-]?\s*(.+)$/i);
+        if (newMatch && newMatch[1] && newMatch[1].trim()) {
+            return { intent: 'new', prompt: newMatch[1].trim() };
+        }
+
+        // 6. Trợ giúp / Help
+        if (/^(hướng dẫn|trợ giúp|lệnh|help)$/i.test(clean)) {
+            return { intent: 'help' };
+        }
+
+        // 7. Mặc định: Gửi prompt vào Antigravity
+        return { intent: 'prompt', prompt: text };
+    }
+
     async handleVoiceMessage(message, attachment) {
         const user = message.author?.username || 'Unknown';
         this.log(`[Voice] Received voice attachment from @${user}: ${attachment.url}`);
@@ -127,23 +168,56 @@ class DiscordCommandHandler {
                 return this.reply(message.channel_id, '⚠️ Không nhận diện được âm thanh hoặc giọng nói quá nhỏ.');
             }
 
-            const embed = {
-                title: '🎙️ Voice Transcribed & Sent to Antigravity!',
-                description: `**Nội dung nhận diện:**\n> "${transcribed}"`,
-                color: 0x5865F2,
-                fields: [
-                    { name: 'Người gửi', value: `<@${message.author.id}>`, inline: true },
-                    { name: 'Model', value: '`whisper-large-v3-turbo`', inline: true }
-                ],
-                footer: { text: 'Antigravity Voice Bridge' }
-            };
+            const parsed = this.parseVoiceIntent(transcribed);
+            this.log(`[Voice Intent] Detected intent: ${parsed.intent} (text="${transcribed}")`);
 
-            await this.reply(message.channel_id, '', embed);
+            if (parsed.intent === 'sessions') {
+                await this.reply(message.channel_id, `🎙️ *Voice: "${transcribed}"* ➡️ **Thực thi: Danh sách Session**`);
+                await this.cmdSessions(message);
+            } else if (parsed.intent === 'switch') {
+                await this.reply(message.channel_id, `🎙️ *Voice: "${transcribed}"* ➡️ **Thực thi: Chuyển sang session \`${parsed.target}\`**`);
+                await this.cmdSwitch(message, parsed.target);
+            } else if (parsed.intent === 'stop') {
+                await this.reply(message.channel_id, `🎙️ *Voice: "${transcribed}"* ➡️ **Thực thi: Dừng task đang chạy**`);
+                await this.cmdStop(message);
+            } else if (parsed.intent === 'status') {
+                await this.reply(message.channel_id, `🎙️ *Voice: "${transcribed}"* ➡️ **Thực thi: Kiểm tra trạng thái**`);
+                await this.cmdStatus(message);
+            } else if (parsed.intent === 'help') {
+                await this.reply(message.channel_id, `🎙️ *Voice: "${transcribed}"* ➡️ **Thực thi: Hướng dẫn sử dụng**`);
+                await this.cmdHelp(message);
+            } else if (parsed.intent === 'new') {
+                const embed = {
+                    title: '🎙️ Voice: Mở Session mới & Gửi Prompt',
+                    description: `**Nội dung:**\n> "${parsed.prompt}"`,
+                    color: 0x5865F2,
+                    fields: [
+                        { name: 'Người nói', value: `<@${message.author.id}>`, inline: true },
+                        { name: 'Chế độ', value: '✨ Phiên mới', inline: true }
+                    ],
+                    footer: { text: 'Antigravity Voice Controller' }
+                };
+                await this.reply(message.channel_id, '', embed);
+                await this.cmdPrompt(message, parsed.prompt, true);
+            } else {
+                // Default: Regular prompt into Antigravity
+                const embed = {
+                    title: '🎙️ Voice Transcribed & Sent to Antigravity!',
+                    description: `**Nội dung nhận diện:**\n> "${transcribed}"`,
+                    color: 0x5865F2,
+                    fields: [
+                        { name: 'Người gửi', value: `<@${message.author.id}>`, inline: true },
+                        { name: 'Model', value: '`whisper-large-v3-turbo`', inline: true }
+                    ],
+                    footer: { text: 'Antigravity Voice Bridge' }
+                };
 
-            // Send into Antigravity
-            const res = await this.router.sendPrompt(transcribed, false);
-            if (!res || !res.ok) {
-                await this.reply(message.channel_id, `⚠️ Không thể nạp prompt vào Antigravity: ${res?.error || 'Lỗi kết nối'}`);
+                await this.reply(message.channel_id, '', embed);
+
+                const res = await this.router.sendPrompt(transcribed, false);
+                if (!res || !res.ok) {
+                    await this.reply(message.channel_id, `⚠️ Không thể nạp prompt vào Antigravity: ${res?.error || 'Lỗi kết nối'}`);
+                }
             }
         } catch (err) {
             this.log(`[Voice Error] ${err.message}`);

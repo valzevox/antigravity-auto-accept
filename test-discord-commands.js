@@ -147,6 +147,33 @@ async function run() {
     assert.strictEqual(sentMessages[1].embed.title, '🎙️ Voice Transcribed & Sent to Antigravity!');
     assert.ok(sentMessages[1].embed.description.includes('build a landing page'));
 
+    // Test 15: Voice Intent Parsing
+    assert.strictEqual(handler.parseVoiceIntent('danh sách session').intent, 'sessions');
+    assert.strictEqual(handler.parseVoiceIntent('xem các phiên').intent, 'sessions');
+    assert.strictEqual(handler.parseVoiceIntent('chuyển sang session Higgsfield').intent, 'switch');
+    assert.strictEqual(handler.parseVoiceIntent('chuyển sang session Higgsfield').target, 'higgsfield');
+    assert.strictEqual(handler.parseVoiceIntent('dừng lại').intent, 'stop');
+    assert.strictEqual(handler.parseVoiceIntent('trạng thái').intent, 'status');
+    assert.strictEqual(handler.parseVoiceIntent('viết unit test cho auth').intent, 'prompt');
+
+    // Test 16: Voice message with 'danh sách session' triggers cmdSessions
+    handler.voiceHandler.processDiscordVoice = async () => 'danh sách các session';
+    sentMessages = [];
+    await handler.handleMessage({
+        author: { bot: false, id: '111', username: 'valzevox' },
+        channel_id: 'chan_1',
+        content: '',
+        attachments: [{
+            name: 'voice.ogg',
+            content_type: 'audio/ogg',
+            url: 'https://cdn.discord.com/fake.ogg'
+        }]
+    });
+    // Expected: 1. Đang nhận diện..., 2. Thực thi: Danh sách Session, 3. Embed sessions
+    assert.ok(sentMessages.length >= 3);
+    assert.ok(sentMessages[1].content.includes('Thực thi: Danh sách Session'));
+    assert.strictEqual(sentMessages[2].embed.title, '📂 Danh sách Sessions trong Antigravity');
+
     console.log('DiscordCommandHandler self-check: PASS');
 }
 
