@@ -17,6 +17,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { Notifier } = require('./notifier');
 
 const TAIL_BYTES = 256 * 1024;
 const DEFAULT_INTERVAL = 2000;
@@ -54,9 +55,11 @@ class MultiSessionRouter {
         );
         this.interval = options.interval || DEFAULT_INTERVAL;
         this.log = options.log || (() => {});
+        this.notifier = options.notifier || new Notifier();
         this.timer = null;
         this.busy = false;
         this.cooldowns = new Map();
+        this.seenSteps = new Map();
     }
 
     start() {
@@ -117,9 +120,37 @@ class MultiSessionRouter {
             const last = this.tailRecord(file);
             if (!last) continue;
             if (last.type !== 'PLANNER_RESPONSE' || last.status !== 'DONE') continue;
-            if (!Array.isArray(last.tool_calls) || last.tool_calls.length === 0) continue;
 
             const key = `${id}:${last.step_index}`;
+
+            // Case A: Agent asks user a question (manual intervention required)
+            if (Array.isArray(last.tool_calls) && last.tool_calls.some(tc => tc.name === 'ask_question')) {
+                if (!this.seenSteps.has(key)) {
+                    this.seenSteps.set(key, now);
+                    const qCall = last.tool_calls.find(tc => tc.name === 'ask_question');
+                    const details = typeof qCall?.args === 'string' ? qCall.args : JSON.stringify(qCall?.args || {});
+                    this.notifier.notify('manual_intervention', {
+                        session: id,
+                        summary: 'Agent/Subagent requires manual user decision or input.',
+                        details
+                    });
+                }
+                continue;
+            }
+
+            // Case B: Agent completed response with no further tool calls
+            if (!Array.isArray(last.tool_calls) || last.tool_calls.length === 0) {
+                if (!this.seenSteps.has(key)) {
+                    this.seenSteps.set(key, now);
+                    this.notifier.notify('task_completed', {
+                        session: id,
+                        summary: (last.content || 'Agent concluded task without further tool calls.').slice(0, 300)
+                    });
+                }
+                continue;
+            }
+
+            // Case C: Pending tool approval (can be auto-approved)
             const until = this.cooldowns.get(key);
             if (until && until > now) continue;
 
@@ -156,6 +187,10 @@ class MultiSessionRouter {
         const approved = await this.evalPage(targetId, PAGE_HAS_APPROVAL);
         if (approved) {
             this.log(`[MultiSession] Approved pending request in ${to}`);
+            this.notifier.notify('auto_approved', {
+                session: to.replace('/c/', ''),
+                summary: `Auto-approved tool execution in session ${to}`
+            });
             await sleep(SETTLE_BACK_MS);
         }
 

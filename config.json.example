@@ -1,0 +1,16 @@
+{
+  "webhooks": {
+    "discord": "",
+    "telegram": {
+      "botToken": "",
+      "chatId": ""
+    },
+    "customUrl": ""
+  },
+  "events": {
+    "onManualIntervention": true,
+    "onTaskCompleted": true,
+    "onAutoApproved": true,
+    "onError": true
+  }
+}

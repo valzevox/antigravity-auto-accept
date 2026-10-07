@@ -35,6 +35,7 @@ When building large software or letting AI agents complete autonomous multi-step
 
 - 🎯 **Native Antigravity 2.0 Multi-Choice Support**: Intelligently handles the 5-choice permission modals, automatically selects *"Yes, and always allow in this conversation/project"*, and triggers the `Submit` button.
 - 🔀 **Multi-Session Auto-Router & Seamless Background Hop**: Monitors all background conversations across your entire workspace/brain. When an agent in another session halts on a tool or permission request, the router automatically hops to that conversation, approves it, and immediately returns you back to your current active session!
+- 🔔 **Discord & Telegram Webhook Notifications**: Real-time alerts for agent task completion, manual user intervention required (e.g. subagent asking questions), auto-approval history, and errors.
 - 🚀 **100% Standalone Background Daemon**: Runs silently in the background as a lightweight system service or background process without needing VS Code workbench windows.
 - 🛡️ **Dangerous Command Guard**: Built-in safety filter automatically blocks hazardous patterns (`rm -rf /`, `format c:`, `dd if=`, etc.).
 - 🔄 **Auto-Reconnection**: Resilient WebSocket layer detects when Antigravity opens or closes, instantly reconnecting within 3 seconds.
@@ -133,6 +134,41 @@ run.bat
 | `status.bat` | Check if the daemon is running and CDP is connected |
 | `node daemon.js` | Run daemon in foreground (for debugging) |
 | `node test-multi-session.js` | Run self-test for Multi-Session Auto-Router detection |
+| `node test-notifier.js` | Run self-test for Discord & Telegram Webhook notifications |
+
+---
+
+## 🔔 Webhook Notifications (Discord & Telegram)
+
+Get alerted on Discord or Telegram whenever your AI subagents require attention:
+- ✋ **Manual Intervention**: Subagent is asking for user guidance or questions (`ask_question`).
+- 🎯 **Task Completed**: Subagent concluded its work turn without further tool calls.
+- 🚀 **Auto-Approved**: Successfully auto-approved permission in a background session.
+
+### Quick Setup:
+
+Copy `config.json.example` to `config.json`:
+
+```json
+{
+  "webhooks": {
+    "discord": "https://discord.com/api/webhooks/YOUR_WEBHOOK_URL",
+    "telegram": {
+      "botToken": "YOUR_TELEGRAM_BOT_TOKEN",
+      "chatId": "YOUR_CHAT_ID"
+    },
+    "customUrl": ""
+  },
+  "events": {
+    "onManualIntervention": true,
+    "onTaskCompleted": true,
+    "onAutoApproved": true,
+    "onError": true
+  }
+}
+```
+
+You can toggle individual alert types on/off according to your preference!
 
 ---
 

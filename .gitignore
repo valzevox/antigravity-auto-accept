@@ -10,3 +10,4 @@ Thumbs.db
 .vscode-test/
 coverage/
 .agent/
+config.json
