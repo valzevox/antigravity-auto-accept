@@ -1,9 +1,15 @@
 {
   "webhooks": {
-    "discord": "",
+    "discord": "https://discord.com/api/webhooks/YOUR_WEBHOOK_URL",
+    "discordBot": {
+      "token": "YOUR_DISCORD_BOT_TOKEN",
+      "channelId": "YOUR_CHANNEL_ID",
+      "guildId": "YOUR_GUILD_ID",
+      "mentionUserId": "YOUR_DISCORD_USER_ID"
+    },
     "telegram": {
-      "botToken": "",
-      "chatId": ""
+      "botToken": "YOUR_TELEGRAM_BOT_TOKEN",
+      "chatId": "YOUR_CHAT_ID"
     },
     "customUrl": ""
   },

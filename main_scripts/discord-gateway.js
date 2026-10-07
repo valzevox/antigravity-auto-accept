@@ -196,10 +196,11 @@ class DiscordGatewayBridge {
     /**
      * Send rich embed message with interactive buttons to the configured Discord channel
      */
-    async sendMessageWithButtons(embed, options = [], sessionId = '') {
+    async sendMessageWithButtons(embed, options = [], sessionId = '', content = '') {
         if (!this.channelId || !this.token) return false;
 
         const payload = {
+            content: content || undefined,
             embeds: [embed],
             components: []
         };

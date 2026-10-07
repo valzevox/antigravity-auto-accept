@@ -2,12 +2,12 @@ const assert = require('assert');
 const { Notifier, EVENT_META } = require('./main_scripts/notifier');
 
 // Check 1: Disabled by default when no webhooks configured
-const emptyNotifier = new Notifier({ discord: '', telegramBotToken: '', telegramChatId: '', customUrl: '' });
+const emptyNotifier = new Notifier({ discord: '', discordBotToken: '', telegramBotToken: '', telegramChatId: '', customUrl: '' });
 assert.strictEqual(emptyNotifier.isEnabled(), false, 'empty config should disable notifier');
 
 // Check 2: Enabled when Discord URL provided
-assert.strictEqual(new Notifier({ discord: 'https://discord.com/api/webhooks/x/y' }).isEnabled(), true);
-assert.strictEqual(new Notifier({ telegramBotToken: '123:ABC', telegramChatId: '99' }).isEnabled(), true);
+assert.strictEqual(new Notifier({ discord: 'https://discord.com/api/webhooks/x/y', discordBotToken: '' }).isEnabled(), true);
+assert.strictEqual(new Notifier({ discord: '', discordBotToken: '', telegramBotToken: '123:ABC', telegramChatId: '99' }).isEnabled(), true);
 
 // Check 3: Case 1 with options builds Telegram answer buttons
 const n = new Notifier({ telegramBotToken: '123:ABC', telegramChatId: '99' });

@@ -65,6 +65,13 @@ const dbot = router.notifier.config.webhooks.discordBot;
 if (dbot.token && dbot.channelId) {
     discordBridge = new DiscordGatewayBridge(router, dbot, log);
     router.notifier.setGateway(discordBridge);
+    discordBridge.start();
+    log('[AutoAccept Daemon] Discord Bot Gateway started.');
+}
+
+if (bridge) {
+    bridge.start();
+    log('[AutoAccept Daemon] Telegram Bridge started.');
 }
 
 async function loop() {
@@ -82,21 +89,21 @@ async function loop() {
                 log('[AutoAccept Daemon] Successfully connected to Antigravity 2.0 via CDP!');
                 isConnected = true;
                 router.start();
-                if (bridge) bridge.start();
-                if (discordBridge) discordBridge.start();
             }
         } else {
             if (isConnected) {
                 log('[AutoAccept Daemon] Antigravity disconnected or closed. Waiting for Antigravity...');
                 isConnected = false;
                 router.stop();
-                if (bridge) bridge.stop();
-                if (discordBridge) discordBridge.stop();
                 await handler.stop();
             }
         }
     } catch (err) {
         log(`[AutoAccept Daemon] Error: ${err.message}`);
+        router.notifier.notify(4, {
+            summary: `Daemon runtime error: ${err.message}`,
+            details: err.stack || err.message
+        });
     }
     setTimeout(loop, CHECK_INTERVAL);
 }

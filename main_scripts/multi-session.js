@@ -199,10 +199,11 @@ class MultiSessionRouter {
 
         const approved = await this.evalPage(targetId, PAGE_HAS_APPROVAL);
         if (approved) {
-            this.log(`[MultiSession] Approved pending request in ${to}`);
+            const sid = to.replace('/c/', '');
+            this.log(`[MultiSession] Approved pending request in ${sid}`);
             this.notifier.notify(3, {
-                session: to.replace('/c/', ''),
-                summary: `Auto-approved tool execution in session ${to}`
+                session: sid,
+                summary: `Tự động phê duyệt quyền (Always Allow) thành công cho phiên \`${sid}\``
             });
             await sleep(SETTLE_BACK_MS);
         }

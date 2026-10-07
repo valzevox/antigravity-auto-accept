@@ -80,7 +80,8 @@ class Notifier {
                 discordBot: {
                     token: pick(process.env.DISCORD_BOT_TOKEN, override.discordBotToken, botFile.token),
                     channelId: pick(process.env.DISCORD_BOT_CHANNEL_ID, override.discordBotChannelId, botFile.channelId),
-                    guildId: pick(process.env.DISCORD_BOT_GUILD_ID, override.discordBotGuildId, botFile.guildId)
+                    guildId: pick(process.env.DISCORD_BOT_GUILD_ID, override.discordBotGuildId, botFile.guildId),
+                    mentionUserId: pick(process.env.DISCORD_MENTION_USER_ID, override.mentionUserId, botFile.mentionUserId, fileConfig.mentionUserId)
                 },
                 telegram: {
                     botToken: pick(process.env.TELEGRAM_BOT_TOKEN, override.telegramBotToken, tgFile.botToken),
@@ -218,15 +219,18 @@ class Notifier {
 
         const jobs = [];
 
-        // Discord Bot channel: full interactive support with buttons.
+        // Discord Bot channel: full interactive support with buttons + user ping on Case 1.
         if (this.gateway && discordBot.token && discordBot.channelId) {
-            jobs.push(this.gateway.sendMessageWithButtons(msg.embed, options, payload.session || ''));
+            const mention = (code === 1 && discordBot.mentionUserId) ? `<@${discordBot.mentionUserId}>` : '';
+            jobs.push(this.gateway.sendMessageWithButtons(msg.embed, options, payload.session || '', mention));
         }
 
         if (discord) {
+            const mention = (code === 1 && discordBot.mentionUserId) ? `<@${discordBot.mentionUserId}>\n` : '';
             jobs.push(this.post(discord, {
                 username: BRAND.name,
                 avatar_url: BRAND.avatar,
+                content: mention || undefined,
                 embeds: [msg.embed]
             }));
         }
