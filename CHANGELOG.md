@@ -2,6 +2,23 @@
 
 All notable changes to the **Antigravity Auto Accept** extension are documented here.
 
+## [2.1.0] - 2026-10-08
+
+### Added
+- **1-Click PowerShell Installer (`install.ps1`)**: Modeled after Free Claude Code (FCC) for zero-friction setup via a single command line (`irm ... | iex`).
+- **Interactive Credentials Onboarding**: Guided prompt during setup to configure Discord Bot Token, Channel ID, Owner User ID, Groq API key, and Telegram credentials directly in terminal.
+- **Port 9000 Auto-Patcher**: Scans Desktop and Start Menu across all system paths to ensure shortcuts launch with `--remote-debugging-port=9000`.
+- **Fast Startup & Auto-Updater**: Windows Task Scheduler automatically runs `update.bat` (git fetch + pull in 1s) followed by `run.bat` upon system reboot without re-running interactive setup.
+
+### Changed
+- Streamlined repository root: removed obsolete batch scripts (`setup.bat`, `run-win11.bat`, `bootstrap.bat`).
+- Unified `run.bat` to launch a dedicated, visible console window seamlessly on both Windows 10 and Windows 11.
+- Upgraded `update.bat` to a silent, fast updater that handles updates and dependencies non-interactively.
+
+### Fixed
+- Stripped UTF-8 Byte Order Mark (BOM) in `config.json` loaders to prevent JSON parsing errors.
+- Secured command and voice access to the configured `ownerUserId` only.
+
 ## [1.2.0] - 2026-04-26
 
 ### Fixed
