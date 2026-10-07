@@ -138,12 +138,13 @@ run.bat
 
 ---
 
-## 🔔 Webhook Notifications (Discord & Telegram)
+## 🔔 Webhook Notifications & Remote Action Buttons (Discord & Telegram)
 
-Get alerted on Discord or Telegram whenever your AI subagents require attention:
-- ✋ **Manual Intervention**: Subagent is asking for user guidance or questions (`ask_question`).
-- 🎯 **Task Completed**: Subagent concluded its work turn without further tool calls.
-- 🚀 **Auto-Approved**: Successfully auto-approved permission in a background session.
+Get alerted on Discord or Telegram whenever your AI subagents require attention, styled with native Antigravity branding:
+- 1️⃣ **Case 1 (Manual Intervention)**: Subagent asks a question (`ask_question`). On Telegram, interactive inline buttons are attached for each option so you can tap to select and submit directly from your phone!
+- 2️⃣ **Case 2 (Task Completed)**: Subagent concluded its work turn without further tool calls.
+- 3️⃣ **Case 3 (Auto-Approved)**: Auto-accept successfully hopped and approved a permission request.
+- 4️⃣ **Case 4 (Execution Error)**: Subagent hit an error.
 
 ### Quick Setup:
 
@@ -168,7 +169,7 @@ Copy `config.json.example` to `config.json`:
 }
 ```
 
-You can toggle individual alert types on/off according to your preference!
+> **Remote Button Answering (Telegram):** When you tap an option button in Telegram, the built-in bridge automatically navigates Antigravity to that conversation, selects the corresponding option, and clicks `Submit` without needing port forwarding!
 
 ---
 

@@ -123,26 +123,39 @@ class MultiSessionRouter {
 
             const key = `${id}:${last.step_index}`;
 
-            // Case A: Agent asks user a question (manual intervention required)
+            // Case 1: Agent asks user a question (manual intervention required)
             if (Array.isArray(last.tool_calls) && last.tool_calls.some(tc => tc.name === 'ask_question')) {
                 if (!this.seenSteps.has(key)) {
                     this.seenSteps.set(key, now);
                     const qCall = last.tool_calls.find(tc => tc.name === 'ask_question');
-                    const details = typeof qCall?.args === 'string' ? qCall.args : JSON.stringify(qCall?.args || {});
-                    this.notifier.notify('manual_intervention', {
+                    let promptText = '';
+                    let options = [];
+                    try {
+                        const raw = typeof qCall?.args === 'string' ? JSON.parse(qCall.args) : (qCall?.args || {});
+                        const qArr = Array.isArray(raw?.questions) ? raw.questions : (typeof raw?.questions === 'string' ? JSON.parse(raw.questions) : []);
+                        if (qArr.length) {
+                            promptText = qArr[0].question || '';
+                            options = Array.isArray(qArr[0].options) ? qArr[0].options : [];
+                        }
+                    } catch (e) {
+                        promptText = typeof qCall?.args === 'string' ? qCall.args : JSON.stringify(qCall?.args || {});
+                    }
+
+                    this.notifier.notify(1, {
                         session: id,
-                        summary: 'Agent/Subagent requires manual user decision or input.',
-                        details
+                        summary: promptText || 'Agent requires user decision or input.',
+                        details: promptText,
+                        options
                     });
                 }
                 continue;
             }
 
-            // Case B: Agent completed response with no further tool calls
+            // Case 2: Agent completed response with no further tool calls
             if (!Array.isArray(last.tool_calls) || last.tool_calls.length === 0) {
                 if (!this.seenSteps.has(key)) {
                     this.seenSteps.set(key, now);
-                    this.notifier.notify('task_completed', {
+                    this.notifier.notify(2, {
                         session: id,
                         summary: (last.content || 'Agent concluded task without further tool calls.').slice(0, 300)
                     });
@@ -150,7 +163,7 @@ class MultiSessionRouter {
                 continue;
             }
 
-            // Case C: Pending tool approval (can be auto-approved)
+            // Case 3: Pending tool approval (can be auto-approved)
             const until = this.cooldowns.get(key);
             if (until && until > now) continue;
 
@@ -187,7 +200,7 @@ class MultiSessionRouter {
         const approved = await this.evalPage(targetId, PAGE_HAS_APPROVAL);
         if (approved) {
             this.log(`[MultiSession] Approved pending request in ${to}`);
-            this.notifier.notify('auto_approved', {
+            this.notifier.notify(3, {
                 session: to.replace('/c/', ''),
                 summary: `Auto-approved tool execution in session ${to}`
             });

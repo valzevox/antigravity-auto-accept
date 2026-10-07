@@ -1,9 +1,13 @@
 /**
  * Antigravity Auto Accept - Webhook Notifier
- * Supports Discord Webhooks, Telegram Bot API, and Custom Webhooks.
+ * Discord Webhooks + Telegram Bot API + Custom HTTP webhook.
  *
- * ponytail: uses Node stdlib https/http without axios/node-fetch.
- * Upgrade to undici or retry-queue if network drops frequently.
+ * Interactive answer buttons are Telegram-only on purpose: Telegram long-polling
+ * reaches this machine with no public URL and no port forwarding. Discord sends
+ * component interactions to an Application Interaction Endpoint, which would
+ * require a public HTTPS endpoint, so Discord gets rich embeds only.
+ *
+ * ponytail: raw https instead of undici/fetch. Upgrade if proxy or retry is needed.
  */
 
 const https = require('https');
@@ -12,11 +16,41 @@ const url = require('url');
 const fs = require('fs');
 const path = require('path');
 
-const COLORS = {
-    MANUAL: 0xF59E0B,   // Orange/Yellow - needs user input
-    COMPLETED: 0x10B981,// Green - task finished
-    APPROVED: 0x3B82F6, // Blue - auto-approved
-    ERROR: 0xEF4444     // Red - error
+const BRAND = {
+    name: 'Antigravity',
+    avatar: 'https://cdn.discordapp.com/embed/avatars/0.png',
+    footer: 'Antigravity 2.0 • Auto Accept'
+};
+
+const EVENT_META = {
+    1: {
+        key: 'manual_intervention',
+        title: 'Manual Intervention Required',
+        color: 0xF59E0B,
+        icon: '✋',
+        label: 'Agent needs your decision'
+    },
+    2: {
+        key: 'task_completed',
+        title: 'Task Completed',
+        color: 0x10B981,
+        icon: '✅',
+        label: 'Agent finished its turn'
+    },
+    3: {
+        key: 'auto_approved',
+        title: 'Auto-Approved',
+        color: 0x3B82F6,
+        icon: '⚡',
+        label: 'Permission granted automatically'
+    },
+    4: {
+        key: 'error',
+        title: 'Execution Error',
+        color: 0xEF4444,
+        icon: '❌',
+        label: 'Agent run failed'
+    }
 };
 
 class Notifier {
@@ -33,21 +67,26 @@ class Notifier {
             } catch (e) {}
         }
 
+        const tgFile = fileConfig.webhooks?.telegram || {};
+        const pick = (...vals) => {
+            for (const v of vals) if (v !== undefined && v !== null) return v;
+            return '';
+        };
+
         return {
             webhooks: {
-                discord: process.env.DISCORD_WEBHOOK_URL || override.discord || fileConfig.webhooks?.discord || '',
+                discord: pick(process.env.DISCORD_WEBHOOK_URL, override.discord, fileConfig.webhooks?.discord),
                 telegram: {
-                    botToken: process.env.TELEGRAM_BOT_TOKEN || override.telegramBotToken || fileConfig.webhooks?.telegram?.botToken || '',
-                    chatId: process.env.TELEGRAM_CHAT_ID || override.telegramChatId || fileConfig.webhooks?.telegram?.chatId || ''
+                    botToken: pick(process.env.TELEGRAM_BOT_TOKEN, override.telegramBotToken, tgFile.botToken),
+                    chatId: pick(process.env.TELEGRAM_CHAT_ID, override.telegramChatId, tgFile.chatId)
                 },
-                customUrl: process.env.CUSTOM_WEBHOOK_URL || override.customUrl || fileConfig.webhooks?.customUrl || ''
+                customUrl: pick(process.env.CUSTOM_WEBHOOK_URL, override.customUrl, fileConfig.webhooks?.customUrl)
             },
             events: {
-                onManualIntervention: fileConfig.events?.onManualIntervention ?? true,
-                onTaskCompleted: fileConfig.events?.onTaskCompleted ?? true,
-                onAutoApproved: fileConfig.events?.onAutoApproved ?? true,
-                onError: fileConfig.events?.onError ?? true,
-                ...override.events
+                1: pick(override.events?.[1], fileConfig.events?.onManualIntervention, true),
+                2: pick(override.events?.[2], fileConfig.events?.onTaskCompleted, true),
+                3: pick(override.events?.[3], fileConfig.events?.onAutoApproved, true),
+                4: pick(override.events?.[4], fileConfig.events?.onError, true)
             }
         };
     }
@@ -57,32 +96,32 @@ class Notifier {
         return Boolean(discord || (telegram.botToken && telegram.chatId) || customUrl);
     }
 
-    async post(targetUrl, payload) {
-        if (!targetUrl) return false;
+    post(targetUrl, payload, method = 'POST') {
+        if (!targetUrl) return Promise.resolve(false);
         return new Promise((resolve) => {
             try {
                 const parsed = url.parse(targetUrl);
-                const reqLib = parsed.protocol === 'http:' ? http : https;
-                const body = JSON.stringify(payload);
+                const lib = parsed.protocol === 'http:' ? http : https;
+                const body = method === 'POST' ? JSON.stringify(payload) : null;
+                const headers = {};
+                if (body) {
+                    headers['Content-Type'] = 'application/json';
+                    headers['Content-Length'] = Buffer.byteLength(body);
+                }
 
-                const req = reqLib.request(parsed, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Content-Length': Buffer.byteLength(body)
-                    },
-                    timeout: 5000
-                }, (res) => {
-                    resolve(res.statusCode >= 200 && res.statusCode < 300);
+                const req = lib.request(parsed, { method, headers, timeout: 5000 }, (res) => {
+                    let raw = '';
+                    res.on('data', (c) => { raw += c; });
+                    res.on('end', () => {
+                        const ok = res.statusCode >= 200 && res.statusCode < 300;
+                        if (!ok) return resolve(false);
+                        try { resolve(JSON.parse(raw)); } catch (e) { resolve(true); }
+                    });
                 });
 
                 req.on('error', () => resolve(false));
-                req.on('timeout', () => {
-                    req.destroy();
-                    resolve(false);
-                });
-
-                req.write(body);
+                req.on('timeout', () => { req.destroy(); resolve(false); });
+                if (body) req.write(body);
                 req.end();
             } catch (e) {
                 resolve(false);
@@ -90,105 +129,112 @@ class Notifier {
         });
     }
 
-    async sendDiscord(embed) {
-        const webhookUrl = this.config.webhooks.discord;
-        if (!webhookUrl) return;
-        return this.post(webhookUrl, {
-            username: 'Antigravity Agent Sentinel',
-            avatar_url: 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png',
-            embeds: [embed]
-        });
+    /** Trim a label to fit Telegram's 64-char button text budget. */
+    static shortLabel(text, max = 58) {
+        const flat = String(text || '').replace(/\s+/g, ' ').trim();
+        return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
     }
 
-    async sendTelegram(textHtml) {
-        const { botToken, chatId } = this.config.webhooks.telegram;
-        if (!botToken || !chatId) return;
-        const tgUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
-        return this.post(tgUrl, {
-            chat_id: chatId,
-            text: textHtml,
-            parse_mode: 'HTML'
-        });
-    }
+    /**
+     * @param {number} code 1..4 from EVENT_META
+     * @param {object} payload { session, summary, details, options: string[] }
+     */
+    buildMessage(code, payload = {}) {
+        const meta = EVENT_META[code] || EVENT_META[1];
+        const { session = 'unknown', summary = '', details = '', options = [] } = payload;
+        const stamp = new Date().toISOString().replace('T', ' ').replace(/\..+/, ' UTC');
+        const short = session.length > 14 ? `${session.slice(0, 10)}…` : session;
 
-    async sendCustom(eventData) {
-        const customUrl = this.config.webhooks.customUrl;
-        if (!customUrl) return;
-        return this.post(customUrl, eventData);
-    }
-
-    async notify(event, payload = {}) {
-        if (!this.isEnabled()) return;
-
-        const {
-            session = 'unknown',
-            summary = '',
-            details = '',
-            extra = {}
-        } = payload;
-
-        let title = '';
-        let color = COLORS.APPROVED;
-        let icon = '⚡';
-
-        if (event === 'manual_intervention') {
-            if (!this.config.events.onManualIntervention) return;
-            title = '⚠️ Manual Intervention Required';
-            color = COLORS.MANUAL;
-            icon = '✋';
-        } else if (event === 'task_completed') {
-            if (!this.config.events.onTaskCompleted) return;
-            title = '✅ Agent Task Completed';
-            color = COLORS.COMPLETED;
-            icon = '🎯';
-        } else if (event === 'auto_approved') {
-            if (!this.config.events.onAutoApproved) return;
-            title = '⚡ Auto-Approved Permission';
-            color = COLORS.APPROVED;
-            icon = '🚀';
-        } else if (event === 'error') {
-            if (!this.config.events.onError) return;
-            title = '❌ Agent Execution Error';
-            color = COLORS.ERROR;
-            icon = '💥';
-        }
-
-        const timestamp = new Date().toISOString();
-        const shortSession = session.length > 12 ? `${session.slice(0, 8)}...` : session;
-
-        // 1. Discord Embed
-        const discordEmbed = {
-            title: `${icon} ${title}`,
-            description: summary,
-            color,
-            fields: [
-                { name: 'Session', value: `\`${session}\``, inline: true },
-                { name: 'Timestamp', value: timestamp.replace('T', ' ').replace(/\..+/, ' UTC'), inline: true }
-            ],
-            footer: { text: 'Antigravity Auto Accept • Notification Hub' }
-        };
-
+        const fields = [
+            { name: 'Session', value: `\`${session}\``, inline: true },
+            { name: 'Time', value: stamp, inline: true }
+        ];
         if (details) {
-            discordEmbed.fields.push({
-                name: 'Details / Question',
-                value: details.length > 1000 ? `${details.slice(0, 997)}...` : details,
-                inline: false
+            fields.push({
+                name: 'Prompt',
+                value: details.length > 1000 ? `${details.slice(0, 997)}…` : details
+            });
+        }
+        if (options.length) {
+            fields.push({
+                name: 'Options',
+                value: options.slice(0, 10).map((o, i) => `**${i + 1}.** ${Notifier.shortLabel(o, 90)}`).join('\n')
             });
         }
 
-        // 2. Telegram HTML
-        let tgMsg = `<b>${icon} ${title}</b>\n\n`;
-        tgMsg += `<b>Session:</b> <code>${shortSession}</code>\n`;
-        if (summary) tgMsg += `<b>Summary:</b> ${summary}\n`;
-        if (details) tgMsg += `<b>Details:</b> <i>${details.slice(0, 500)}</i>\n`;
+        return {
+            meta,
+            embed: {
+                author: { name: BRAND.name, icon_url: BRAND.avatar },
+                title: `${meta.icon} ${meta.title}`,
+                description: (summary || meta.label).slice(0, 4000),
+                color: meta.color,
+                fields,
+                footer: { text: BRAND.footer },
+                timestamp: new Date().toISOString()
+            },
+            telegramText:
+                `<b>${meta.icon} ${meta.title}</b>\n\n` +
+                `${summary || meta.label}\n\n` +
+                `<b>Session:</b> <code>${short}</code>\n` +
+                `<b>Time:</b> ${stamp}` +
+                (details ? `\n\n<b>Prompt:</b>\n${details.slice(0, 800)}` : '') +
+                (options.length ? `\n\n${options.slice(0, 10).map((o, i) => `<b>${i + 1}.</b> ${Notifier.shortLabel(o, 200)}`).join('\n')}` : ''),
+            // Interactive buttons only exist for manual intervention.
+            replyMarkup: code === 1 && options.length
+                ? {
+                    inline_keyboard: options.slice(0, 3).map((o, i) => ([
+                        { text: `${i + 1}. ${Notifier.shortLabel(o)}`, callback_data: `ans:${session}:${i}` }
+                    ]))
+                }
+                : undefined
+        };
+    }
 
-        // 3. Dispatch to all active destinations
-        await Promise.allSettled([
-            this.sendDiscord(discordEmbed),
-            this.sendTelegram(tgMsg),
-            this.sendCustom({ event, title, session, summary, details, extra, timestamp })
-        ]);
+    /** @returns {object|null} telegram message id when interactive buttons were attached */
+    async notify(code, payload = {}) {
+        if (!this.isEnabled()) return null;
+        if (!this.config.events[code]) return null;
+
+        const msg = this.buildMessage(code, payload);
+        const { discord, telegram, customUrl } = this.config.webhooks;
+
+        const jobs = [];
+
+        if (discord) {
+            jobs.push(this.post(discord, {
+                username: BRAND.name,
+                avatar_url: BRAND.avatar,
+                embeds: [msg.embed]
+            }));
+        }
+
+        if (telegram.botToken && telegram.chatId) {
+            jobs.push(this.post(`https://api.telegram.org/bot${telegram.botToken}/sendMessage`, {
+                chat_id: telegram.chatId,
+                text: msg.telegramText,
+                parse_mode: 'HTML',
+                disable_web_page_preview: true,
+                reply_markup: msg.replyMarkup
+            }).then((r) => (r && r.result ? r.result.message_id : null)));
+        }
+
+        if (customUrl) {
+            jobs.push(this.post(customUrl, {
+                event: msg.meta.key,
+                code,
+                title: msg.meta.title,
+                session: payload.session,
+                summary: payload.summary || '',
+                details: payload.details || '',
+                options: payload.options || [],
+                timestamp: new Date().toISOString()
+            }));
+        }
+
+        const results = await Promise.all(jobs);
+        return results.find((r) => typeof r === 'number') || null;
     }
 }
 
-module.exports = { Notifier, COLORS };
+module.exports = { Notifier, EVENT_META, BRAND };
