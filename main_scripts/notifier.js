@@ -102,7 +102,8 @@ class Notifier {
                 2: pick(override.events?.[2], fileConfig.events?.onTaskCompleted, true),
                 3: pick(override.events?.[3], fileConfig.events?.onAutoApproved, true),
                 4: pick(override.events?.[4], fileConfig.events?.onError, true)
-            }
+            },
+            maxErrorRetries: Number(pick(override.maxErrorRetries, fileConfig.maxErrorRetries, 5))
         };
     }
 
@@ -184,6 +185,14 @@ class Notifier {
                 color: 0xED4245,
                 icon: '⚠️',
                 label: t.events.quota.label
+            };
+        } else if (code === 4 && payload.isRetryWarning) {
+            meta = {
+                key: 'retry_warning',
+                title: t.events.retryWarning?.title || 'Đã đạt giới hạn thử lại',
+                color: 0xF59E0B,
+                icon: '⚠️',
+                label: t.events.retryWarning?.label || summary
             };
         }
         const { session = 'unknown', summary = '', details = '', options = [] } = payload;

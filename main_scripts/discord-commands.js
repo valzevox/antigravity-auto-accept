@@ -147,6 +147,10 @@ class DiscordCommandHandler {
             case 'setping':
                 await this.cmdSetPing(message, args);
                 break;
+            case 'setretry':
+            case 'retrylimit':
+                await this.cmdSetRetry(message, args);
+                break;
             case 'setgroq':
             case 'groq':
                 await this.cmdSetGroq(message, args[0]);
@@ -343,6 +347,7 @@ class DiscordCommandHandler {
                 { name: '`!language`', value: t.commands.setlanguageDesc, inline: false },
                 { name: '`!setchannel <#channel>`', value: t.commands.setchannelDesc, inline: false },
                 { name: '`!setping <target>`', value: t.commands.setpingDesc, inline: false },
+                { name: '`!setretry <number>`', value: t.commands.setretryDesc, inline: false },
                 { name: '`!channels`', value: t.commands.channelsDesc, inline: false }
             ],
             footer: { text: t.twoWayFooter }
@@ -481,6 +486,7 @@ class DiscordCommandHandler {
                 { name: t.commands.configChannel, value: `<#${bot.channelId || this.gateway.channelId}>`, inline: true },
                 { name: t.commands.configPing, value: pingMode, inline: true },
                 { name: t.commands.configLang, value: currentLang, inline: true },
+                { name: t.commands.configRetries || 'Số lần thử lại khi lỗi', value: `\`${cfg.maxErrorRetries ?? 5}\``, inline: true },
                 { name: t.commands.guildField, value: `\`${bot.guildId || this.gateway.guildId}\``, inline: false }
             ],
             footer: { text: t.commands.configFooter }
@@ -629,6 +635,36 @@ class DiscordCommandHandler {
             await this.reply(message.channel_id, `👑 **Đã cấp quyền chủ sở hữu duy nhất cho:** <@${targetUserId}> (\`${targetUserId}\`)\n🔒 Từ bây giờ chỉ tài khoản này mới có thể dùng các lệnh điều khiển Antigravity.`);
         } else {
             await this.reply(message.channel_id, '❌ Lỗi lưu cấu hình vào `config.json`!');
+        }
+    }
+
+    async cmdSetRetry(message, args) {
+        const num = parseInt(args[0], 10);
+        const isEn = I18nManager.getLanguage() === 'en';
+        if (isNaN(num) || num < 0 || num > 50) {
+            return this.reply(message.channel_id, isEn
+                ? '❌ Usage: `!setretry <number (0-50)>`\nExample: `!setretry 5`'
+                : '❌ Cách dùng: `!setretry <số lần (0-50)>`\nVí dụ: `!setretry 5`');
+        }
+
+        const cfg = this.loadConfig();
+        cfg.maxErrorRetries = num;
+        if (this.saveConfig(cfg)) {
+            if (this.router?.notifier?.config) {
+                this.router.notifier.config.maxErrorRetries = num;
+            }
+            for (const [targetId] of this.router?.handler?.connections || []) {
+                try {
+                    await this.router.evalPage(targetId, `if (window.__autoAcceptFreeState) { window.__autoAcceptFreeState.maxErrorRetries = ${num}; }`);
+                } catch (e) {}
+            }
+            await this.reply(message.channel_id, isEn
+                ? `✅ **Updated maximum error retries to: ${num}**`
+                : `✅ **Đã cập nhật số lần thử lại tối đa khi lỗi: ${num}**`);
+        } else {
+            await this.reply(message.channel_id, isEn
+                ? '❌ Failed to save config to `config.json`!'
+                : '❌ Lỗi lưu cấu hình vào `config.json`!');
         }
     }
 

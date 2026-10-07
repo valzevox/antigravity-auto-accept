@@ -36,6 +36,10 @@ const DICTIONARIES = {
             quota: {
                 title: 'Hết hạn mức dùng token',
                 label: 'Antigravity đã chạm trần giới hạn token của tài khoản'
+            },
+            retryWarning: {
+                title: 'Đã đạt giới hạn thử lại (Retry)',
+                label: 'Tác vụ tạm dừng do model không phản hồi sau số lần thử lại tối đa'
             }
         },
         fields: {
@@ -76,6 +80,7 @@ const DICTIONARIES = {
             configDesc: 'Xem cấu hình hiện tại (kênh gửi tin, chế độ nhắc tên, ngôn ngữ).',
             setchannelDesc: 'Thay đổi kênh nhận thông báo và câu hỏi.',
             setpingDesc: 'Cấu hình đối tượng được nhắc tên khi cần trả lời.',
+            setretryDesc: 'Cấu hình số lần tự động bấm Retry khi gặp lỗi (`!setretry <số lần>`).',
             setlanguageDesc: 'Đổi ngôn ngữ bot (`!lang vi` hoặc `!lang en`).',
             channelsDesc: 'Liệt kê danh sách các kênh trong máy chủ kèm mã nhận diện.',
             statusTitle: '⚡ Trạng thái hệ thống Antigravity',
@@ -90,7 +95,8 @@ const DICTIONARIES = {
             configChannel: 'Kênh nhận thông báo',
             configPing: 'Chế độ nhắc tên',
             configLang: 'Ngôn ngữ hiển thị',
-            configFooter: 'Dùng !setchannel, !setping hoặc !language để điều chỉnh',
+            configRetries: 'Số lần tự động Retry',
+            configFooter: 'Dùng !setchannel, !setping, !setretry hoặc !language để điều chỉnh',
             langPromptTitle: '🌐 Chọn ngôn ngữ / Select Language',
             langPromptDesc: 'Chọn ngôn ngữ giao tiếp cho Bot Discord & Telegram:\nSelect your display language for the bot:',
             langSwitched: '✅ Đã chuyển ngôn ngữ sang **Tiếng Việt**!',
@@ -122,6 +128,10 @@ const DICTIONARIES = {
             quota: {
                 title: 'Token Quota Exhausted',
                 label: 'Antigravity has reached your account token limit'
+            },
+            retryWarning: {
+                title: 'Maximum Retry Limit Reached',
+                label: 'Task paused because the model did not respond after maximum retry attempts'
             }
         },
         fields: {
@@ -162,6 +172,7 @@ const DICTIONARIES = {
             configDesc: 'View current settings (channel, mention ping, language).',
             setchannelDesc: 'Change notification and prompt channel.',
             setpingDesc: 'Configure who gets pinged on questions / completion.',
+            setretryDesc: 'Configure maximum automatic Retry attempts on errors (`!setretry <number>`).',
             setlanguageDesc: 'Change bot language (`!lang en` or `!lang vi`).',
             channelsDesc: 'List available guild channels with IDs.',
             statusTitle: '⚡ Antigravity System Status',
@@ -176,7 +187,8 @@ const DICTIONARIES = {
             configChannel: 'Notification Channel',
             configPing: 'Mention Target',
             configLang: 'Display Language',
-            configFooter: 'Use !setchannel, !setping or !language to adjust',
+            configRetries: 'Max Error Retries',
+            configFooter: 'Use !setchannel, !setping, !setretry or !language to adjust',
             langPromptTitle: '🌐 Select Language / Chọn ngôn ngữ',
             langPromptDesc: 'Select your display language for the bot:\nChọn ngôn ngữ giao tiếp cho Bot Discord & Telegram:',
             langSwitched: '✅ Language switched to **English**!',

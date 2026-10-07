@@ -40,6 +40,7 @@ Khi xây dựng các dự án phần mềm lớn hoặc giao cho AI tự chủ h
 - 🎯 **Hỗ trợ toàn diện hộp thoại trắc nghiệm Antigravity 2.0**: Tự động nhận diện các hộp thoại xin quyền gồm 5 lựa chọn, ưu tiên chọn *"Đồng ý và luôn cho phép trong cuộc trò chuyện/dự án này"* và tự nhấn nút `Gửi (Submit)`.
 - 🔄 **Bảng theo dõi tiến độ thời gian thực trên Discord**: Thẻ trạng thái động tự cập nhật mỗi 2.5 giây. Hiển thị luồng suy nghĩ của Agent, công cụ đang chạy, số lượng sub-agent hoạt động và đồng hồ đếm thời gian. Tự động chuyển thành thẻ hoàn tất màu xanh khi xong việc.
 - ⚠️ **Cảnh báo khẩn cấp khi hết hạn mức token**: Tự động phát hiện khi tài khoản chạm ngưỡng giới hạn token hoặc gặp lỗi và ngắt quãng, lập tức gửi thông báo màu đỏ nổi bật kèm nhắc tên (`@user`) đến điện thoại/máy tính của bạn.
+- 🔁 **Tự động thử lại khi gặp sự cố (Auto-Retry)**: Tự động nhấn nút `Retry` khi model gặp sự cố đường truyền hoặc lỗi tạm thời ("Agent terminated due to error"). Có thể tùy chỉnh số lần thử lại tối đa (mặc định 5 lần). Nếu quá số lần cho phép mà model vẫn không phản hồi, hệ thống sẽ tạm dừng tác vụ và gửi cảnh báo để tránh vòng lặp vô tận.
 - 🎙️ **Điều khiển bằng giọng nói siêu tốc (Groq Whisper)**: Gửi tin nhắn thoại hoặc tập tin âm thanh trên Discord để hỏi trạng thái, chuyển phiên làm việc, dừng tác vụ hoặc nạp yêu cầu vào Antigravity với tốc độ nhận diện chỉ khoảng 300ms.
 - 🔀 **Tự động chuyển phiên làm việc trong nền**: Theo dõi tất cả các cuộc trò chuyện chạy ngầm. Khi một phiên khác bị dừng chờ cấp quyền, hệ thống tự chuyển sang phiên đó duyệt quyền rồi quay về phiên bạn đang theo dõi.
 - 🎮 **Tương tác hai chiều qua nút bấm (Discord & Telegram)**: Khi Agent đặt câu hỏi lựa chọn (`ask_question`), bot sẽ gửi thông báo kèm các nút bấm phương án. Bạn chỉ cần nhấn nút trên điện thoại để gửi câu trả lời về máy tính!
@@ -159,6 +160,7 @@ Mở tập tin **`config.json`** trong thư mục dự án để điền các th
     },
     "customUrl": ""
   },
+  "maxErrorRetries": 5,
   "groqApiKey": "KHÓA_API_GROQ",
   "events": {
     "onManualIntervention": true,
@@ -218,6 +220,7 @@ Bạn có thể tương tác và quản lý Antigravity trực tiếp từ kênh
 | `!language` | Mở bảng nút bấm chọn ngôn ngữ hiển thị (Tiếng Việt / English) | `!language` hoặc `!lang en` |
 | `!setchannel <#kênh>` | Thay đổi kênh nhận thông báo và câu hỏi | `!setchannel #nhat-ky-agent` |
 | `!setping <đối tượng>` | Cài đặt đối tượng nhắc tên khi có câu hỏi hoặc hết hạn mức | `!setping @valzevox` hoặc `!setping off` |
+| `!setretry <số lần>` | Cài đặt số lần tự động bấm Retry khi model gặp sự cố (mặc định: 5) | `!setretry 5` |
 | `!setvoice <on/off>` | Bật hoặc tắt tính năng điều khiển bằng giọng nói | `!setvoice off` |
 | `!setgroq <khóa api>` | Thiết lập khóa API Groq để chuyển giọng nói thành văn bản | `!setgroq gsk_...` |
 | `!help` | Hiển thị bảng trợ giúp danh sách câu lệnh | `!help` |

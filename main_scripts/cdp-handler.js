@@ -448,7 +448,8 @@ class CDPHandler {
         const configJson = JSON.stringify({
             ide: config.ide,
             isBackgroundMode: !!config.isBackgroundMode,
-            bannedCommands: config.bannedCommands || []
+            bannedCommands: config.bannedCommands || [],
+            maxErrorRetries: config.maxErrorRetries !== undefined ? config.maxErrorRetries : 5
         });
         await this._safeEvaluate(id, `if(window.__autoAcceptStart) window.__autoAcceptStart(${configJson})`, retries, sessionId);
     }

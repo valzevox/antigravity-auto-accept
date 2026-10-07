@@ -40,6 +40,7 @@ When developing large projects or delegating multi-step plans to autonomous codi
 - 🎯 **Full Support for Antigravity 2.0 Multi-Option Dialogs**: Automatically identifies 5-option permission prompts, prefers *"Allow and remember in this conversation/project"*, and triggers the `Submit` action.
 - 🔄 **Live Discord Progress Tracker**: A dynamic status embed refreshing every 2.5 seconds. Displays the agent's live thinking process, active tool calls, working sub-agents, and total elapsed duration. Automatically transitions to a green completion card when done.
 - ⚠️ **Instant Quota & Token Limit Alerts**: Detects when your account hits token rate limits (HTTP 429 / resource exhausted), immediately notifying your mobile phone or desktop with a high-visibility red card and user mention (`@user`).
+- 🔁 **Auto-Retry on Transient Model Errors**: Automatically clicks the `Retry` button whenever Antigravity encounters model or network interruptions ("Agent terminated due to error"). Configurable retry cap (default: 5 attempts). If retries are exhausted without a response, the task pauses and sends a warning to avoid infinite loops.
 - 🎙️ **Ultra-Fast Voice Control (Groq Whisper)**: Send voice clips or audio files in Discord to query system status, switch sessions, halt tasks, or inject prompts into Antigravity in ~300ms.
 - 🔀 **Autonomous Multi-Session Hopping**: Observes all background conversation threads. When another session gets blocked waiting for confirmation, the daemon switches into that tab, approves the action, and returns to your active view.
 - 🎮 **Two-Way Interactive Buttons (Discord & Telegram)**: When the agent asks questions (`ask_question`), the bot pushes actionable buttons. Tap the desired option directly on your phone to submit your response back to Antigravity!
@@ -158,6 +159,7 @@ Configure your credentials in **`config.json`**:
     },
     "customUrl": ""
   },
+  "maxErrorRetries": 5,
   "groqApiKey": "GROQ_API_KEY",
   "events": {
     "onManualIntervention": true,
@@ -203,6 +205,7 @@ Configure your credentials in **`config.json`**:
 | `!language` | Interactive button modal to switch between English and Vietnamese | `!language` |
 | `!setchannel <#channel>` | Change target notification and command channel | `!setchannel #agent-logs` |
 | `!setping <target>` | Change mention target (`@user`, `here`, `everyone`, `off`) | `!setping @valzevox` |
+| `!setretry <number>` | Configure maximum automatic Retry attempts on errors (default: 5) | `!setretry 5` |
 | `!setvoice <on/off>` | Enable or disable voice transcription processing | `!setvoice off` |
 | `!setgroq <key>` | Configure Groq API key for voice processing | `!setgroq gsk_...` |
 | `!help` | Show command reference | `!help` |

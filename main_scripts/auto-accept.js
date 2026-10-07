@@ -166,9 +166,13 @@
         const hasErrorRecoveryMarkers = () => {
             const markers = [
                 'agent execution terminated due to error',
+                'agent terminated due to error',
                 'terminated due to error',
                 'continue generating',
-                'execution error'
+                'execution error',
+                'error modeling',
+                'network issue connecting to the server',
+                'model to try again'
             ];
 
             for (const doc of getDocuments()) {
@@ -234,7 +238,7 @@
             if (!el || clickedElements.has(el)) return false;
 
             try {
-                const bypassExclude = reason === 'run-prompt' || reason === 'permission' || reason === 'antigravity2';
+                const bypassExclude = reason === 'run-prompt' || reason === 'permission' || reason === 'antigravity2' || reason === 'error-recovery';
                 if (!bypassExclude && isExcludedControl(el)) return false;
 
                 const now = Date.now();
@@ -690,14 +694,44 @@
             return false;
         })();
         const hasGlobalRecoveryError = hasErrorRecoveryMarkers();
-        // 1.55) Automatic recovery after agent error (Continue Generating)
-        if (hasGlobalRecoveryError) {
-            for (const btn of allActionButtons) {
-                const text = getActionText(btn);
-                const isContinueGenerating = text.includes('continue generating') || /^continue(\b|\s)/i.test(text);
-                if (isContinueGenerating && clickElement(btn)) {
-                    log(`Flow recovered automatically after error: "${text}"`);
-                    return clickedCount;
+        const freeState = window.__autoAcceptFreeState || {};
+        const maxRetries = Number(freeState.maxErrorRetries !== undefined ? freeState.maxErrorRetries : 5);
+
+        if (!hasGlobalRecoveryError) {
+            if (freeState.errorRetryCount > 0) {
+                log(`[AutoAccept] Error condition cleared. Resetting retry counter (was ${freeState.errorRetryCount}).`);
+                freeState.errorRetryCount = 0;
+                freeState.errorRetryExceeded = false;
+                freeState.needsRetryWarning = false;
+                freeState.retryWarningSent = false;
+                window.__autoAcceptFreeState = freeState;
+            }
+        } else {
+            // 1.55) Automatic recovery after agent error (Retry / Continue Generating)
+            if (freeState.errorRetryCount >= maxRetries) {
+                freeState.errorRetryExceeded = true;
+                if (!freeState.retryWarningSent) {
+                    freeState.needsRetryWarning = true;
+                    log(`[AutoAccept] Reached maximum retry limit (${maxRetries}). Pausing auto-retry until model responds.`);
+                }
+                window.__autoAcceptFreeState = freeState;
+            } else {
+                const nowRetry = Date.now();
+                const lastRetryAt = Number(freeState.lastErrorRetryAt || 0);
+                if (nowRetry - lastRetryAt >= 3500) {
+                    for (const btn of allActionButtons) {
+                        const text = getActionText(btn);
+                        const isContinueGenerating = text.includes('continue generating') || /^continue(\b|\s)/i.test(text);
+                        const isRetry = /\b(retry|try again|thử lại)\b/i.test(text) && !/\b(reject|cancel|stop|deny|never)\b/i.test(text);
+
+                        if ((isContinueGenerating || isRetry) && clickElement(btn, 'error-recovery')) {
+                            freeState.lastErrorRetryAt = nowRetry;
+                            freeState.errorRetryCount = (freeState.errorRetryCount || 0) + 1;
+                            window.__autoAcceptFreeState = freeState;
+                            log(`[AutoAccept] Error recovery action clicked: "${text}" (${freeState.errorRetryCount}/${maxRetries})`);
+                            return clickedCount;
+                        }
+                    }
                 }
             }
         }
@@ -1304,13 +1338,18 @@
     }
 
     window.__autoAcceptGetStats = function() {
+        const s = window.__autoAcceptFreeState || {};
         return { 
-            clicks: window.__autoAcceptFreeState.clicks || 0,
-            tabCount: window.__autoAcceptFreeState.tabNames?.length || 0,
-            permissions: window.__autoAcceptFreeState.permissionApprovals || 0,
-            terminalCommands: window.__autoAcceptFreeState.terminalCommands || 0,
-            lastAction: window.__autoAcceptFreeState.lastAction || '',
-            lastActionLabel: window.__autoAcceptFreeState.lastActionLabel || ''
+            clicks: s.clicks || 0,
+            tabCount: s.tabNames?.length || 0,
+            permissions: s.permissionApprovals || 0,
+            terminalCommands: s.terminalCommands || 0,
+            lastAction: s.lastAction || '',
+            lastActionLabel: s.lastActionLabel || '',
+            errorRetryCount: s.errorRetryCount || 0,
+            maxErrorRetries: s.maxErrorRetries !== undefined ? s.maxErrorRetries : 5,
+            errorRetryExceeded: Boolean(s.errorRetryExceeded),
+            needsRetryWarning: Boolean(s.needsRetryWarning)
         };
     };
 
@@ -1328,6 +1367,12 @@
         state.mode = 'simple';
         state.ide = (config.ide || 'vscode').toLowerCase();
         state.bannedCommands = config.bannedCommands || [];
+        state.maxErrorRetries = (typeof config.maxErrorRetries === 'number' && config.maxErrorRetries > 0) ? config.maxErrorRetries : 5;
+        state.errorRetryCount = 0;
+        state.errorRetryExceeded = false;
+        state.needsRetryWarning = false;
+        state.retryWarningSent = false;
+        state.lastErrorRetryAt = 0;
         state.tabNames = [];
         state.lastRunShortcutAt = 0;
         state.lastRunPromptSig = '';

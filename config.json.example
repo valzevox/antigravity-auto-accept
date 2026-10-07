@@ -21,5 +21,6 @@
     "onTaskCompleted": true,
     "onAutoApproved": true,
     "onError": true
-  }
+  },
+  "maxErrorRetries": 5
 }

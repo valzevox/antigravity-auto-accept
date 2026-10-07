@@ -71,6 +71,19 @@ class LoadingWatcher {
     }
 
     /**
+     * Update active session status when retry limit is reached
+     */
+    pauseOrWarn(sessionId, warningSummary) {
+        const state = this.activeSessions.get(sessionId) || Array.from(this.activeSessions.values())[0];
+        if (state) {
+            state.currentAction = warningSummary;
+            state.lastThought = I18nManager.getLanguage() === 'en'
+                ? 'Retry limit reached. Waiting for model response...'
+                : 'Đã đạt giới hạn Retry. Đang chờ model phản hồi...';
+        }
+    }
+
+    /**
      * Start tracking a session and post the initial live loading card
      */
     async trackSession(sessionId, sessionTitle = '', channelId = null) {
@@ -488,11 +501,60 @@ class LoadingWatcher {
                     rawErr.includes('usage limit')
                 );
 
+                // If non-quota error with retry capability, keep card alive and show retry status
+                if (hasError && !isQuota) {
+                    let isRetrying = false;
+                    for (const [targetId] of this.router.handler.connections) {
+                        try {
+                            const retryStatus = await this.router.evalPage(targetId, `(() => {
+                                const st = window.__autoAcceptGetStats ? window.__autoAcceptGetStats() : {};
+                                const hasRetryBtn = !!document.querySelector('button[aria-label*="Retry"], button[title*="Retry"]') ||
+                                    Array.from(document.querySelectorAll('button')).some(b => /\\bretry\\b/i.test(b.textContent || ''));
+                                return {
+                                    hasRetryBtn,
+                                    errorRetryCount: st.errorRetryCount || 0,
+                                    maxErrorRetries: st.maxErrorRetries || 5,
+                                    exceeded: Boolean(st.errorRetryExceeded)
+                                };
+                            })()`);
+
+                            if (retryStatus && retryStatus.hasRetryBtn && !retryStatus.exceeded) {
+                                isRetrying = true;
+                                const isEn = I18nManager.getLanguage() === 'en';
+                                state.currentAction = isEn
+                                    ? `Retrying model (${retryStatus.errorRetryCount}/${retryStatus.maxErrorRetries})...`
+                                    : `Đang thử lại (Retry ${retryStatus.errorRetryCount}/${retryStatus.maxErrorRetries})...`;
+                                state.lastThought = isEn
+                                    ? 'Agent hit error; auto-retry is attempting recovery...'
+                                    : 'Agent gặp sự cố; đang tự động thử lại (Retry)...';
+                                break;
+                            }
+                        } catch (e) {}
+                    }
+
+                    if (isRetrying) {
+                        if (state.messageId && state.channelId) {
+                            const embed = this.buildLoadingEmbed(state);
+                            try {
+                                await gateway.editMessage(state.channelId, state.messageId, { embeds: [embed] });
+                            } catch (e) {}
+                        }
+                        continue;
+                    }
+                }
+
                 let summary = live?.lastResponseText || '';
+                const isEn = I18nManager.getLanguage() === 'en';
                 if (hasError) {
-                    summary = isQuota
-                        ? `Antigravity đã dừng do hết quota / đạt giới hạn token API:\n\`${live.lastError}\`\n\n*Vui lòng kiểm tra lại tài khoản hoặc đợi hồi quota.*`
-                        : `Antigravity gặp lỗi thực thi và đã dừng lại:\n\`${live.lastError}\``;
+                    if (isQuota) {
+                        summary = isEn
+                            ? `Antigravity stopped due to quota limit / API token ceiling:\n\`${live.lastError}\`\n\n*Please verify your account or wait for quota reset.*`
+                            : `Antigravity đã dừng do hết quota / đạt giới hạn token API:\n\`${live.lastError}\`\n\n*Vui lòng kiểm tra lại tài khoản hoặc đợi hồi quota.*`;
+                    } else {
+                        summary = isEn
+                            ? `Antigravity encountered an error and stopped:\n\`${live.lastError}\``
+                            : `Antigravity gặp lỗi thực thi và đã dừng lại:\n\`${live.lastError}\``;
+                    }
                 }
 
                 await this.finishSession(sessionId, summary, hasError);

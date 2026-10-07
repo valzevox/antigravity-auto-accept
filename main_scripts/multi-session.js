@@ -163,24 +163,23 @@ class MultiSessionRouter {
 
             const isExecutionError = isErrorMessageType;
 
-            if (isQuotaExhausted || isExecutionError) {
-                // API retries emit one ERROR_MESSAGE per attempt (up to 6). Alert once per session.
+            if (isQuotaExhausted) {
                 const lastAlert = this.quotaAlerted.get(id) || 0;
                 if (!this.seenSteps.has(key) && (now - lastAlert) > 60000) {
                     this.seenSteps.set(key, now);
                     this.quotaAlerted.set(id, now);
-                    const isQuota = isQuotaExhausted;
+                    const isEn = I18nManager.getLanguage() === 'en';
                     const rawErr = (errorText || contentText || '').trim();
-                    const summary = isQuota
-                        ? `**Hết hạn mức dùng token — Antigravity đã dừng giữa chừng.**\n\nTài khoản đã chạm trần giới hạn của nhà cung cấp, tác vụ chưa xong. Hãy kiểm tra lại tài khoản hoặc chờ mức dùng được hồi lại rồi chạy tiếp.`
-                        : `**Tác vụ bị gián đoạn do lỗi.**\n\nAntigravity đã dừng lại, tác vụ chưa hoàn thành.`;
-                    const details = rawErr ? `Chi tiết lỗi từ hệ thống:\n\`\`\`\n${rawErr}\n\`\`\`` : '';
+                    const summary = isEn
+                        ? `**Token quota exhausted — Antigravity paused mid-task.**\n\nYour account has reached the provider usage limit. Please check your account or wait for quota reset.`
+                        : `**Hết hạn mức dùng token — Antigravity đã dừng giữa chừng.**\n\nTài khoản đã chạm trần giới hạn của nhà cung cấp, tác vụ chưa xong. Hãy kiểm tra lại tài khoản hoặc chờ mức dùng được hồi lại rồi chạy tiếp.`;
+                    const details = rawErr ? (isEn ? `Error details:\n\`\`\`\n${rawErr}\n\`\`\`` : `Chi tiết lỗi từ hệ thống:\n\`\`\`\n${rawErr}\n\`\`\``) : '';
 
                     this.notifier.notify(4, {
                         session: id,
                         summary,
                         details,
-                        isQuota
+                        isQuota: true
                     });
 
                     if (this.loadingWatcher) {
@@ -313,10 +312,52 @@ class MultiSessionRouter {
         }
     }
 
+    async checkRetryWarnings() {
+        for (const [targetId] of this.handler.connections) {
+            try {
+                const stats = await this.evalPage(targetId, `(() => {
+                    if (!window.__autoAcceptGetStats) return null;
+                    const st = window.__autoAcceptGetStats();
+                    if (st.needsRetryWarning) {
+                        if (window.__autoAcceptFreeState) {
+                            window.__autoAcceptFreeState.retryWarningSent = true;
+                            window.__autoAcceptFreeState.needsRetryWarning = false;
+                        }
+                        return st;
+                    }
+                    return null;
+                })()`);
+
+                if (stats) {
+                    const from = await this.currentPath();
+                    const sid = (from && from.startsWith('/c/')) ? from.replace('/c/', '') : 'active';
+                    const isEn = I18nManager.getLanguage() === 'en';
+                    const maxR = stats.maxErrorRetries || 5;
+                    const countR = stats.errorRetryCount || maxR;
+                    const summary = isEn
+                        ? `**Model did not respond after ${countR}/${maxR} retries.**\n\nTask has been paused. Waiting for model response or manual retry intervention.`
+                        : `**Đã thử bấm Retry ${countR}/${maxR} lần nhưng model vẫn không phản hồi.**\n\nTác vụ tạm thời dừng lại để đợi model trả lời hoặc can thiệp thủ công.`;
+
+                    this.notifier.notify(4, {
+                        session: sid,
+                        summary,
+                        isRetryWarning: true
+                    });
+                    this.log(`[MultiSession] Retry warning notified: ${countR}/${maxR} retries`);
+                    if (this.loadingWatcher) {
+                        this.loadingWatcher.pauseOrWarn(sid, summary);
+                    }
+                }
+            } catch (e) {}
+        }
+    }
+
     async tick() {
         if (this.busy) return;
         this.busy = true;
         try {
+            await this.checkRetryWarnings();
+
             const pending = this.findPending();
             if (!pending) return;
 

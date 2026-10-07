@@ -86,7 +86,8 @@ async function loop() {
                 cdpPortRange: 0,
                 isBackgroundMode: true,
                 ide: 'antigravity',
-                quiet: isConnected
+                quiet: isConnected,
+                maxErrorRetries: router.notifier?.config?.maxErrorRetries !== undefined ? router.notifier.config.maxErrorRetries : 5
             });
             if (!isConnected) {
                 log('[AutoAccept Daemon] Successfully connected to Antigravity 2.0 via CDP!');
