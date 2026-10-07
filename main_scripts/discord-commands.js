@@ -59,7 +59,17 @@ class DiscordCommandHandler {
     async handleMessage(message) {
         if (!message || message.author?.bot) return;
 
-        // Check for Voice message / Audio attachments first
+        const cfg = this.loadConfig();
+        const targetChannelId = this.gateway?.channelId || cfg.webhooks?.discordBot?.channelId;
+
+        // CRITICAL FIX: Only process messages & voice sent inside the configured bot channel!
+        // Prevents triggering prompts or voice recognition from other channels in the server.
+        if (targetChannelId && String(message.channel_id) !== String(targetChannelId)) {
+            return;
+        }
+
+        // Check for Voice message / Audio attachments
+        const voiceEnabled = cfg.voiceEnabled !== false; // Default true
         const attachments = message.attachments || [];
         const audioAttachment = attachments.find(a => {
             const ct = (a.content_type || '').toLowerCase();
@@ -70,6 +80,10 @@ class DiscordCommandHandler {
         });
 
         if (audioAttachment) {
+            if (!voiceEnabled) {
+                // Voice feature is disabled by owner, ignore audio attachments
+                return;
+            }
             if (!this.isAuthorized(message)) {
                 await this.reply(message.channel_id, `🔒 <@${message.author.id}> Bạn không có quyền điều khiển Antigravity bằng voice. Chỉ chủ sở hữu mới được sử dụng.`);
                 return;
@@ -134,6 +148,10 @@ class DiscordCommandHandler {
             case 'setgroq':
             case 'groq':
                 await this.cmdSetGroq(message, args[0]);
+                break;
+            case 'setvoice':
+            case 'voice':
+                await this.cmdSetVoice(message, args[0]);
                 break;
             case 'setowner':
             case 'owner':
@@ -272,6 +290,28 @@ class DiscordCommandHandler {
             await this.reply(message.channel_id, `✅ **Đã lưu Groq API Key thành công:** \`${masked}\`\n🎙️ Bây giờ bạn có thể gửi voice note vào kênh này, bot sẽ tự động nhận diện và gửi prompt vào Antigravity!`);
         } else {
             await this.reply(message.channel_id, '❌ Không thể ghi vào config.json');
+        }
+    }
+
+    async cmdSetVoice(message, state) {
+        const raw = (state || '').toLowerCase().trim();
+        if (raw !== 'on' && raw !== 'off' && raw !== 'enable' && raw !== 'disable') {
+            const cfg = this.loadConfig();
+            const current = cfg.voiceEnabled !== false ? 'BẬT (ON)' : 'TẮT (OFF)';
+            return this.reply(message.channel_id, `ℹ️ Trạng thái nhận diện giọng nói hiện tại: **${current}**\nCách dùng: \`!setvoice on\` (bật) hoặc \`!setvoice off\` (tắt).`);
+        }
+
+        const enabled = raw === 'on' || raw === 'enable';
+        const cfg = this.loadConfig();
+        cfg.voiceEnabled = enabled;
+
+        if (this.saveConfig(cfg)) {
+            const msg = enabled 
+                ? '✅ **Đã BẬT chức năng nhận diện giọng nói (Voice Control)**.\n🎙️ Giờ bạn có thể gửi voice note/audio trong kênh này để điều khiển Antigravity.'
+                : '🔇 **Đã TẮT chức năng nhận diện giọng nói (Voice Control)**.\n🔒 Bot sẽ bỏ qua tất cả tin nhắn thoại/audio, không tự động trigger prompt voice.';
+            await this.reply(message.channel_id, msg);
+        } else {
+            await this.reply(message.channel_id, '❌ Lỗi lưu cấu hình vào config.json');
         }
     }
 

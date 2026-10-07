@@ -132,12 +132,15 @@ run.bat
 | Command | Description |
 | :--- | :--- |
 | `setup.bat` | Full 1-click setup: install, patch shortcuts, register startup, run daemon |
-| `run.bat` | Start or restart the background daemon (headless, via Scheduled Task) |
-| `run-win11.bat` | **Windows 11**: Start or restart the daemon with a **visible popup Console window** so you can watch logs live |
+| `update.bat` | 🔄 **1-Click Auto-Updater**: Checks remote GitHub commits, pulls changes, updates packages, and restarts daemon |
+| `run.bat` | Start or restart the background daemon (auto-checks for GitHub updates on startup) |
+| `run-win11.bat` | **Windows 11**: Start or restart with a **visible popup Console window** + auto-updates on startup |
 | `status.bat` | Check if the daemon is running and CDP is connected |
 | `node daemon.js` | Run daemon in foreground (for debugging) |
 | `node test-multi-session.js` | Run self-test for Multi-Session Auto-Router detection |
 | `node test-notifier.js` | Run self-test for Discord & Telegram Webhook notifications |
+
+> 💡 **Tự động cập nhật khi khởi động máy (Boot Auto-Update)**: Mỗi khi bạn khởi động lại máy tính (Windows Startup / Reboot), hệ thống sẽ tự động so sánh commit với GitHub, kéo bản mới nhất về (`git pull`) và cập nhật dependencies rồi mới khởi chạy daemon. Không cần phải mở PowerShell hay thao tác thủ công!
 
 ---
 
@@ -205,18 +208,24 @@ Manage Antigravity directly from Discord — both receive notifications AND send
 | `!setchannel <#channel \| id>` | Change notification & prompt channel live | `!setchannel #agent-logs` |
 | `!setping <target>` | Change ping target on prompts & task completion | `!setping here` / `!setping @valzevox` / `!setping off` |
 | `!channels` | List server text channels with IDs for easy selection | `!channels` |
+| `!setvoice <on\|off>` | Bật hoặc tắt tính năng nhận diện giọng nói (Voice Control) | `!setvoice off` |
 | `!help` | Show command help in an interactive embed | `!help` |
 
+> **🛡️ Channel Isolation (Cách ly kênh bảo mật):**
+> Bot **chỉ lắng nghe và xử lý tin nhắn / voice note trong đúng Channel ID** được cấu hình trong `config.json` (hoặc đặt qua `!setchannel`). Tất cả tin nhắn, tập tin audio, hay voice note ở các kênh khác trong server đều được bỏ qua 100%, chống trigger nhầm!
+
 > **🎙️ Voice-to-Prompt & Voice Control:**
-> Send an audio file or record a Discord voice note into the bot channel! The bot automatically:
-> 1. Converts audio via FFmpeg (or direct upload) and transcribes with Groq Whisper (`whisper-large-v3-turbo`) in ~300ms.
-> 2. **Phân tích khẩu lệnh (Voice Commands):**
->    - *"Danh sách session"* / *"Xem các phiên"* ➡️ Tự động liệt kê các sessions đang mở.
->    - *"Chuyển sang session <tên hoặc ID>"* ➡️ Tự động chuyển tab Antigravity sang phiên đó.
->    - *"Dừng lại"* / *"Hủy task"* ➡️ Dừng tác vụ đang chạy.
->    - *"Trạng thái"* / *"Status"* ➡️ Kiểm tra tình trạng kết nối.
->    - *"Phiên mới: <prompt>"* ➡️ Mở phiên làm việc mới và nạp prompt.
->    - *Mọi câu nói thông thường khác* ➡️ Tự động nạp thành Prompt vào phiên hiện tại và nhấn Enter!
+> Gửi file âm thanh hoặc nhấn giữ ghi âm trực tiếp trên Discord vào đúng kênh của bot!
+> - Nếu bạn không muốn nhận diện voice, có thể gõ `!setvoice off` để tắt bất cứ lúc nào!
+> - Khi bật (`!setvoice on`):
+>   1. Chuyển đổi âm thanh tự động và nhận diện qua Groq Whisper (`whisper-large-v3-turbo`) siêu tốc (~300ms).
+>   2. **Phân tích khẩu lệnh (Voice Commands):**
+>      - *"Danh sách session"* / *"Xem các phiên"* ➡️ Tự động liệt kê các sessions đang mở.
+>      - *"Chuyển sang session <tên hoặc ID>"* ➡️ Tự động chuyển tab Antigravity sang phiên đó.
+>      - *"Dừng lại"* / *"Hủy task"* ➡️ Dừng tác vụ đang chạy.
+>      - *"Trạng thái"* / *"Status"* ➡️ Kiểm tra tình trạng kết nối.
+>      - *"Phiên mới: <prompt>"* ➡️ Mở phiên làm việc mới và nạp prompt.
+>      - *Mọi câu nói thông thường khác* ➡️ Tự động nạp thành Prompt vào phiên hiện tại và nhấn Enter!
 
 > **Note:** `!prompt` requires Antigravity to be open on this machine. If the IDE is closed the bot replies with a clear error so you know nothing was lost.
 

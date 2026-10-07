@@ -8,7 +8,7 @@ const { DiscordCommandHandler } = require('./main_scripts/discord-commands');
 async function run() {
     let sentMessages = [];
     const mockGateway = {
-        channelId: '1557278717313556531',
+        channelId: 'chan_1',
         guildId: '710045911371350117',
         async sendChannelMessage(channelId, content, embed) {
             sentMessages.push({ channelId, content, embed });
@@ -16,7 +16,7 @@ async function run() {
         },
         async fetchGuildChannels() {
             return [
-                { id: '1557278717313556531', name: 'general', type: 0 },
+                { id: 'chan_1', name: 'general', type: 0 },
                 { id: '2222222222222222222', name: 'logs', type: 0 }
             ];
         }
@@ -31,7 +31,7 @@ async function run() {
             config: {
                 webhooks: {
                     discordBot: {
-                        channelId: '123456789012345678',
+                        channelId: 'chan_1',
                         mentionUserId: ''
                     }
                 }
@@ -82,8 +82,9 @@ async function run() {
     assert.strictEqual(mockGateway.channelId, '2222222222222222222');
     assert.strictEqual(mockRouter.notifier.config.webhooks.discordBot.channelId, '2222222222222222222');
 
-    // Revert channel back to 1557278717313556531
-    await handler.handleMessage({ author: { bot: false }, channel_id: 'chan_1', content: '!setchannel 1557278717313556531' });
+    // Revert channel back to chan_1
+    mockGateway.channelId = 'chan_1';
+    mockRouter.notifier.config.webhooks.discordBot.channelId = 'chan_1';
 
     // Test 8: !prompt / !message
     mockRouter.sendPrompt = async (text, isNew) => ({ ok: true, method: 'button', text, isNew });
@@ -179,11 +180,12 @@ async function run() {
     // Test 17: Unauthorized user trying to run !stop
     sentMessages.length = 0;
     handler.loadConfig = () => ({
-        webhooks: { discordBot: { mentionUserId: '999999999999999999' } }
+        webhooks: { discordBot: { channelId: 'chan_1', mentionUserId: '999999999999999999' } }
     });
+    mockGateway.channelId = 'chan_1';
     await handler.handleMessage({
         author: { id: '111111111111111111', username: 'attacker' },
-        channel_id: 'chan-1',
+        channel_id: 'chan_1',
         content: '!stop'
     });
     assert.strictEqual(sentMessages.length, 1);
@@ -193,7 +195,7 @@ async function run() {
     sentMessages.length = 0;
     await handler.handleMessage({
         author: { id: '111111111111111111', username: 'attacker' },
-        channel_id: 'chan-1',
+        channel_id: 'chan_1',
         attachments: [{
             url: 'https://cdn.discord.com/fake.ogg',
             content_type: 'audio/ogg'
@@ -201,6 +203,48 @@ async function run() {
     });
     assert.strictEqual(sentMessages.length, 1);
     assert.ok(sentMessages[0].content.includes('Bạn không có quyền điều khiển'));
+
+    // Test 19: Message in unrelated channel is ignored completely
+    sentMessages.length = 0;
+    handler.loadConfig = () => ({
+        webhooks: { discordBot: { channelId: 'chan-allowed' } }
+    });
+    mockGateway.channelId = 'chan-allowed';
+    await handler.handleMessage({
+        author: { id: 'admin-1', username: 'admin' },
+        channel_id: 'chan-random-unrelated',
+        content: '!status'
+    });
+    assert.strictEqual(sentMessages.length, 0); // Must be ignored!
+
+    // Test 20: !setvoice off
+    sentMessages.length = 0;
+    let localConfig = {
+        webhooks: { discordBot: { channelId: 'chan-allowed' } },
+        voiceEnabled: true
+    };
+    handler.loadConfig = () => localConfig;
+    handler.saveConfig = (c) => { localConfig = c; return true; };
+    await handler.handleMessage({
+        author: { id: 'admin-1', username: 'admin' },
+        channel_id: 'chan-allowed',
+        content: '!setvoice off'
+    });
+    assert.strictEqual(sentMessages.length, 1);
+    assert.ok(sentMessages[0].content.includes('TẮT chức năng'));
+    assert.strictEqual(localConfig.voiceEnabled, false);
+
+    // Test 21: When voiceEnabled is false, audio attachment is ignored (no trigger)
+    sentMessages.length = 0;
+    await handler.handleMessage({
+        author: { id: 'admin-1', username: 'admin' },
+        channel_id: 'chan-allowed',
+        attachments: [{
+            url: 'https://cdn.discord.com/fake.ogg',
+            content_type: 'audio/ogg'
+        }]
+    });
+    assert.strictEqual(sentMessages.length, 0); // No voice trigger when disabled!
 
     console.log('DiscordCommandHandler self-check: PASS');
 }
