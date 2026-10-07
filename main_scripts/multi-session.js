@@ -155,9 +155,18 @@ class MultiSessionRouter {
             if (!Array.isArray(last.tool_calls) || last.tool_calls.length === 0) {
                 if (!this.seenSteps.has(key)) {
                     this.seenSteps.set(key, now);
+                    let content = (last.content || '').trim();
+                    if (!content) {
+                        content = 'Agent hoàn tất lượt công việc (Không còn yêu cầu công cụ nào khác).';
+                    } else if (content.length > 3000) {
+                        const cut = content.slice(0, 3000);
+                        const lastNl = cut.lastIndexOf('\n');
+                        const safe = lastNl > 2200 ? cut.slice(0, lastNl) : cut;
+                        content = `${safe.trim()}\n\n*... (Xem chi tiết đầy đủ trong Antigravity)*`;
+                    }
                     this.notifier.notify(2, {
                         session: id,
-                        summary: (last.content || 'Agent concluded task without further tool calls.').slice(0, 300)
+                        summary: content
                     });
                 }
                 continue;

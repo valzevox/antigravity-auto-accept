@@ -152,6 +152,13 @@ class Notifier {
         return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
     }
 
+    static escapeHtml(str = '') {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
     /**
      * @param {number} code 1..4 from EVENT_META
      * @param {object} payload { session, summary, details, options: string[] }
@@ -179,6 +186,9 @@ class Notifier {
             });
         }
 
+        const tgSummary = Notifier.escapeHtml(summary || meta.label);
+        const tgSafeSummary = tgSummary.length > 2500 ? `${tgSummary.slice(0, 2497)}…` : tgSummary;
+
         return {
             meta,
             embed: {
@@ -192,11 +202,11 @@ class Notifier {
             },
             telegramText:
                 `<b>${meta.icon} ${meta.title}</b>\n\n` +
-                `${summary || meta.label}\n\n` +
+                `${tgSafeSummary}\n\n` +
                 `<b>Session:</b> <code>${short}</code>\n` +
                 `<b>Time:</b> ${stamp}` +
-                (details ? `\n\n<b>Prompt:</b>\n${details.slice(0, 800)}` : '') +
-                (options.length ? `\n\n${options.slice(0, 10).map((o, i) => `<b>${i + 1}.</b> ${Notifier.shortLabel(o, 200)}`).join('\n')}` : ''),
+                (details ? `\n\n<b>Prompt:</b>\n${Notifier.escapeHtml(details).slice(0, 800)}` : '') +
+                (options.length ? `\n\n${options.slice(0, 10).map((o, i) => `<b>${i + 1}.</b> ${Notifier.escapeHtml(Notifier.shortLabel(o, 200))}`).join('\n')}` : ''),
             // Interactive buttons only exist for manual intervention.
             replyMarkup: code === 1 && options.length
                 ? {

@@ -23,9 +23,11 @@ assert.strictEqual(msg.replyMarkup.inline_keyboard.length, 3, 'one button per op
 assert.strictEqual(msg.replyMarkup.inline_keyboard[0][0].callback_data, 'ans:abc-123:0');
 assert.ok(msg.embed.fields.some((f) => f.name === 'Options'), 'embed must list options');
 
-// Check 4: Case 2/3 must NOT carry buttons
-const done = n.buildMessage(2, { session: 'abc', summary: 'finished' });
+// Check 4: Case 2/3 must NOT carry buttons, and Case 2 preserves long text
+const longSummary = 'A'.repeat(2500);
+const done = n.buildMessage(2, { session: 'abc', summary: longSummary });
 assert.strictEqual(done.replyMarkup, undefined, 'completed task must not expose buttons');
+assert.strictEqual(done.embed.description.length, 2500, 'must preserve long task description');
 const auto = n.buildMessage(3, { session: 'abc', summary: 'auto' });
 assert.strictEqual(auto.replyMarkup, undefined, 'auto-approved must not expose buttons');
 
