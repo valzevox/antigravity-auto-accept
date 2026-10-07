@@ -13,6 +13,7 @@
     },
     "customUrl": ""
   },
+  "groqApiKey": "YOUR_GROQ_API_KEY",
   "events": {
     "onManualIntervention": true,
     "onTaskCompleted": true,

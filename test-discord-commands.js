@@ -31,7 +31,7 @@ async function run() {
             config: {
                 webhooks: {
                     discordBot: {
-                        channelId: '1557278717313556531',
+                        channelId: '123456789012345678',
                         mentionUserId: ''
                     }
                 }
