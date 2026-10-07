@@ -51,12 +51,20 @@ function checkCdpPort(port) {
 
 const { MultiSessionRouter } = require('./main_scripts/multi-session');
 const { TelegramAnswerBridge } = require('./main_scripts/telegram-bridge');
+const { DiscordGatewayBridge } = require('./main_scripts/discord-gateway');
 const router = new MultiSessionRouter(handler, { log });
 
 let bridge = null;
 const tgToken = router.notifier.config.webhooks.telegram.botToken;
 if (tgToken) {
     bridge = new TelegramAnswerBridge(router, tgToken, log);
+}
+
+let discordBridge = null;
+const dbot = router.notifier.config.webhooks.discordBot;
+if (dbot.token && dbot.channelId) {
+    discordBridge = new DiscordGatewayBridge(router, dbot, log);
+    router.notifier.setGateway(discordBridge);
 }
 
 async function loop() {
@@ -75,6 +83,7 @@ async function loop() {
                 isConnected = true;
                 router.start();
                 if (bridge) bridge.start();
+                if (discordBridge) discordBridge.start();
             }
         } else {
             if (isConnected) {
@@ -82,6 +91,7 @@ async function loop() {
                 isConnected = false;
                 router.stop();
                 if (bridge) bridge.stop();
+                if (discordBridge) discordBridge.stop();
                 await handler.stop();
             }
         }

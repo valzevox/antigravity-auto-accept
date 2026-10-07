@@ -68,6 +68,7 @@ class Notifier {
         }
 
         const tgFile = fileConfig.webhooks?.telegram || {};
+        const botFile = fileConfig.webhooks?.discordBot || {};
         const pick = (...vals) => {
             for (const v of vals) if (v !== undefined && v !== null) return v;
             return '';
@@ -76,6 +77,11 @@ class Notifier {
         return {
             webhooks: {
                 discord: pick(process.env.DISCORD_WEBHOOK_URL, override.discord, fileConfig.webhooks?.discord),
+                discordBot: {
+                    token: pick(process.env.DISCORD_BOT_TOKEN, override.discordBotToken, botFile.token),
+                    channelId: pick(process.env.DISCORD_BOT_CHANNEL_ID, override.discordBotChannelId, botFile.channelId),
+                    guildId: pick(process.env.DISCORD_BOT_GUILD_ID, override.discordBotGuildId, botFile.guildId)
+                },
                 telegram: {
                     botToken: pick(process.env.TELEGRAM_BOT_TOKEN, override.telegramBotToken, tgFile.botToken),
                     chatId: pick(process.env.TELEGRAM_CHAT_ID, override.telegramChatId, tgFile.chatId)
@@ -92,8 +98,18 @@ class Notifier {
     }
 
     isEnabled() {
-        const { discord, telegram, customUrl } = this.config.webhooks;
-        return Boolean(discord || (telegram.botToken && telegram.chatId) || customUrl);
+        const { discord, discordBot, telegram, customUrl } = this.config.webhooks;
+        return Boolean(
+            discord ||
+            (discordBot.token && discordBot.channelId) ||
+            (telegram.botToken && telegram.chatId) ||
+            customUrl
+        );
+    }
+
+    /** Attach the Discord Gateway bridge after the router is built. */
+    setGateway(bridge) {
+        this.gateway = bridge;
     }
 
     post(targetUrl, payload, method = 'POST') {
@@ -197,9 +213,15 @@ class Notifier {
         if (!this.config.events[code]) return null;
 
         const msg = this.buildMessage(code, payload);
-        const { discord, telegram, customUrl } = this.config.webhooks;
+        const { discord, discordBot, telegram, customUrl } = this.config.webhooks;
+        const options = payload.options || [];
 
         const jobs = [];
+
+        // Discord Bot channel: full interactive support with buttons.
+        if (this.gateway && discordBot.token && discordBot.channelId) {
+            jobs.push(this.gateway.sendMessageWithButtons(msg.embed, options, payload.session || ''));
+        }
 
         if (discord) {
             jobs.push(this.post(discord, {
