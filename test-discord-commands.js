@@ -81,6 +81,26 @@ async function run() {
     // Revert channel back to 1557278717313556531
     await handler.handleMessage({ author: { bot: false }, channel_id: 'chan_1', content: '!setchannel 1557278717313556531' });
 
+    // Test 8: !prompt / !message
+    mockRouter.sendPrompt = async (text, isNew) => ({ ok: true, method: 'button', text, isNew });
+    sentMessages = [];
+    await handler.handleMessage({ author: { bot: false, id: '111', username: 'valzevox' }, channel_id: 'chan_1', content: '!prompt write unit test' });
+    assert.strictEqual(sentMessages.length, 1);
+    assert.strictEqual(sentMessages[0].embed.title, '🚀 Đã nạp prompt vào Antigravity!');
+
+    // Test 9: !new
+    sentMessages = [];
+    await handler.handleMessage({ author: { bot: false, id: '111', username: 'valzevox' }, channel_id: 'chan_1', content: '!new new task' });
+    assert.strictEqual(sentMessages.length, 1);
+    assert.strictEqual(sentMessages[0].embed.title, '✨ Đã mở phiên mới và gửi prompt!');
+
+    // Test 10: !stop
+    mockRouter.stopCurrentTask = async () => ({ ok: true });
+    sentMessages = [];
+    await handler.handleMessage({ author: { bot: false }, channel_id: 'chan_1', content: '!stop' });
+    assert.strictEqual(sentMessages.length, 1);
+    assert.ok(sentMessages[0].content.includes('Đã gửi lệnh dừng task'));
+
     console.log('DiscordCommandHandler self-check: PASS');
 }
 

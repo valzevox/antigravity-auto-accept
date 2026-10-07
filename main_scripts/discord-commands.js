@@ -52,6 +52,19 @@ class DiscordCommandHandler {
             case 'commands':
                 await this.cmdHelp(message);
                 break;
+            case 'prompt':
+            case 'message':
+            case 'ask':
+                await this.cmdPrompt(message, args.join(' '), false);
+                break;
+            case 'new':
+            case 'newchat':
+                await this.cmdPrompt(message, args.join(' '), true);
+                break;
+            case 'stop':
+            case 'cancel':
+                await this.cmdStop(message);
+                break;
             case 'status':
                 await this.cmdStatus(message);
                 break;
@@ -79,18 +92,57 @@ class DiscordCommandHandler {
     async cmdHelp(message) {
         const embed = {
             title: '🛠️ Antigravity Discord Control Commands',
-            description: 'Các lệnh quản lý trực tiếp Antigravity Bot từ Discord:',
+            description: 'Các lệnh quản lý và tương tác 2 chiều với Antigravity:',
             color: 0x5865F2,
             fields: [
-                { name: '`!status`', value: 'Kiểm tra trạng thái Antigravity CDP & background daemon.', inline: false },
+                { name: '`!prompt <nội dung>` hoặc `!message <nội dung>`', value: '🚀 **Gửi prompt trực tiếp vào Antigravity** để Agent thực thi!', inline: false },
+                { name: '`!new <nội dung>`', value: '✨ Mở phiên chat mới và gửi prompt thực thi.', inline: false },
+                { name: '`!stop`', value: '🛑 Dừng khẩn cấp task đang chạy trong Antigravity.', inline: false },
+                { name: '`!status`', value: 'Kiểm tra trạng thái CDP & background daemon.', inline: false },
                 { name: '`!config`', value: 'Xem cấu hình hiện tại (kênh gửi, chế độ ping).', inline: false },
                 { name: '`!setchannel <#kênh hoặc ID>`', value: 'Đổi kênh bot sẽ gửi thông báo và câu hỏi.', inline: false },
-                { name: '`!setping <@user | here | everyone | off>`', value: 'Cấu hình ai sẽ được ping khi có câu hỏi lựa chọn.', inline: false },
+                { name: '`!setping <@user | here | everyone | off>`', value: 'Cấu hình ai sẽ được ping khi có câu hỏi / hoàn tất task.', inline: false },
                 { name: '`!channels`', value: 'Liệt kê danh sách các kênh trong server kèm ID.', inline: false }
             ],
-            footer: { text: 'Antigravity 2.0 • Remote Management' }
+            footer: { text: 'Antigravity 2.0 • Remote 2-Way Controller' }
         };
         await this.reply(message.channel_id, '', embed);
+    }
+
+    async cmdPrompt(message, promptText, isNew = false) {
+        if (!promptText || !promptText.trim()) {
+            return this.reply(message.channel_id, '❌ Cách dùng: `!prompt <nội dung cần làm>`\nVí dụ: `!prompt hãy kiểm tra lỗi trong file index.js giúp anh`');
+        }
+
+        const author = message.author?.username || 'User';
+        this.log(`[DiscordCommands] Sending prompt from @${author} (new=${isNew}): ${promptText.slice(0, 80)}...`);
+
+        const res = await this.router.sendPrompt(promptText, isNew);
+        if (res && res.ok) {
+            const embed = {
+                title: isNew ? '✨ Đã mở phiên mới và gửi prompt!' : '🚀 Đã nạp prompt vào Antigravity!',
+                description: `**Nội dung:**\n> ${promptText.length > 500 ? promptText.slice(0, 500) + '...' : promptText}`,
+                color: 0x10B981,
+                fields: [
+                    { name: 'Người gửi', value: `<@${message.author.id}>`, inline: true },
+                    { name: 'Phương thức', value: `\`${res.method || 'DOM'}\``, inline: true }
+                ],
+                footer: { text: 'Agent đang xử lý... Kết quả sẽ gửi về đây khi hoàn thành!' }
+            };
+            await this.reply(message.channel_id, '', embed);
+        } else {
+            const err = res?.error || 'Không thể tương tác với Antigravity';
+            await this.reply(message.channel_id, `❌ **Lỗi khi gửi prompt:** ${err}\n*(Kiểm tra xem Antigravity có đang mở trên máy không)*`);
+        }
+    }
+
+    async cmdStop(message) {
+        const res = await this.router.stopCurrentTask();
+        if (res && res.ok) {
+            await this.reply(message.channel_id, '🛑 **Đã gửi lệnh dừng task đang chạy trong Antigravity!**');
+        } else {
+            await this.reply(message.channel_id, `⚠️ ${res?.error || 'Không thể dừng hoặc không có task nào đang chạy.'}`);
+        }
     }
 
     async cmdStatus(message) {

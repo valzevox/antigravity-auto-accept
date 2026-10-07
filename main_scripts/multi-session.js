@@ -251,6 +251,112 @@ class MultiSessionRouter {
             this.busy = false;
         }
     }
+
+    /**
+     * Dispatch a user prompt into Antigravity input field and send it
+     */
+    async sendPrompt(text, newSession = false) {
+        if (!text || !text.trim()) return { ok: false, error: 'Nội dung prompt trống' };
+        let targetId = null;
+        for (const [id] of this.handler.connections) {
+            targetId = id;
+            break;
+        }
+        if (!targetId) return { ok: false, error: 'Antigravity CDP chưa kết nối' };
+
+        const expr = `(async () => {
+            try {
+                if (${newSession} && window.__TSR_ROUTER__) {
+                    await window.__TSR_ROUTER__.navigate({ to: '/' });
+                    await new Promise(r => setTimeout(r, 600));
+                }
+
+                // Find input textarea or contenteditable
+                const textarea = document.querySelector('textarea, [contenteditable="true"]');
+                if (!textarea) return { ok: false, error: 'Không tìm thấy khung chat trong Antigravity' };
+
+                textarea.focus();
+                if (textarea.tagName.toLowerCase() === 'textarea') {
+                    // Bypass React controlled input cache
+                    const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+                    if (nativeSetter) {
+                        nativeSetter.call(textarea, ${JSON.stringify(text)});
+                    } else {
+                        textarea.value = ${JSON.stringify(text)};
+                    }
+                    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                    textarea.dispatchEvent(new Event('change', { bubbles: true }));
+                } else {
+                    textarea.textContent = ${JSON.stringify(text)};
+                    textarea.dispatchEvent(new InputEvent('input', { bubbles: true, data: ${JSON.stringify(text)} }));
+                }
+
+                await new Promise(r => setTimeout(r, 300));
+
+                // Find send button
+                const buttons = Array.from(document.querySelectorAll('button'));
+                const sendBtn = buttons.find(b => {
+                    const label = (b.getAttribute('aria-label') || '').toLowerCase();
+                    const bText = (b.textContent || '').toLowerCase().trim();
+                    return !b.disabled && (
+                        label.includes('send') || 
+                        label.includes('gửi') || 
+                        bText === 'send' || 
+                        bText === 'gửi' ||
+                        b.querySelector('svg')
+                    );
+                });
+
+                if (sendBtn) {
+                    sendBtn.click();
+                    return { ok: true, method: 'button' };
+                } else {
+                    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+                    return { ok: true, method: 'enter' };
+                }
+            } catch (err) {
+                return { ok: false, error: err.message };
+            }
+        })()`;
+
+        const res = await this.evalPage(targetId, expr);
+        return res || { ok: false, error: 'Không thể thực thi script trong webview' };
+    }
+
+    /**
+     * Emergency stop the running task in Antigravity
+     */
+    async stopCurrentTask() {
+        let targetId = null;
+        for (const [id] of this.handler.connections) {
+            targetId = id;
+            break;
+        }
+        if (!targetId) return { ok: false, error: 'Antigravity CDP chưa kết nối' };
+
+        const expr = `(() => {
+            const buttons = Array.from(document.querySelectorAll('button'));
+            const stopBtn = buttons.find(b => {
+                const label = (b.getAttribute('aria-label') || '').toLowerCase();
+                const bText = (b.textContent || '').toLowerCase().trim();
+                return !b.disabled && (
+                    label.includes('stop') || 
+                    label.includes('cancel') || 
+                    label.includes('dừng') ||
+                    bText.includes('stop') || 
+                    bText.includes('dừng')
+                );
+            });
+            if (stopBtn) {
+                stopBtn.click();
+                return { ok: true };
+            }
+            return { ok: false, error: 'Không tìm thấy nút Stop/Dừng đang hoạt động' };
+        })()`;
+
+        const res = await this.evalPage(targetId, expr);
+        return res || { ok: false, error: 'Không thể thực thi script' };
+    }
 }
 
 module.exports = { MultiSessionRouter };

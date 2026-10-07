@@ -183,19 +183,25 @@ Copy `config.json.example` to `config.json` and configure your credentials:
 
 ---
 
-### Remote In-Chat Discord Management:
+### Remote Two-Way Discord Controller:
 
-You can manage bot settings and monitor Antigravity directly inside your Discord server using text commands:
+Manage Antigravity directly from Discord — both receive notifications AND send prompts back into the IDE:
 
 | Command | Description | Example |
 |---|---|---|
+| `!prompt <text>` | **Send a prompt directly into Antigravity** and execute it | `!prompt fix the bug in index.js` |
+| `!message <text>` | Alias of `!prompt` | `!message build a login page` |
+| `!ask <text>` | Alias of `!prompt` | `!ask summarize this repo` |
+| `!new <text>` | Open a fresh Antigravity session, then send the prompt | `!new refactor auth module` |
+| `!stop` | Emergency stop the currently running task | `!stop` |
 | `!status` | Check Antigravity CDP connection & active session | `!status` |
 | `!config` | View active notification channel & ping settings | `!config` |
 | `!setchannel <#channel \| id>` | Change notification & prompt channel live | `!setchannel #agent-logs` |
-| `!setping <target>` | Change who gets pinged on option prompts (`@user`, `here`, `everyone`, `off`) | `!setping here` or `!setping @valzevox` |
+| `!setping <target>` | Change ping target on prompts & task completion | `!setping here` / `!setping @valzevox` / `!setping off` |
 | `!channels` | List server text channels with IDs for easy selection | `!channels` |
 | `!help` | Show command help in an interactive embed | `!help` |
 
+> **Note:** `!prompt` requires Antigravity to be open on this machine. If the IDE is closed the bot replies with a clear error so you know nothing was lost.
 
 #### How to get Discord credentials:
 1. **Bot Token**: [Discord Developer Portal](https://discord.com/developers/applications) → Your App → **Bot** → **Reset Token** → Copy.
