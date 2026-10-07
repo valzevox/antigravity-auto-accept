@@ -25,6 +25,8 @@ async function run() {
     const mockRouter = {
         cdp: { connected: true },
         currentSessionPath: '/c/test-session-123',
+        getSessions: async () => ({ currentId: 'test-session-123', currentTitle: 'Test Session', sessions: [] }),
+        switchSession: async (q) => ({ ok: true, session: { id: q, title: 'Switched Session' } }),
         notifier: {
             config: {
                 webhooks: {
@@ -100,6 +102,28 @@ async function run() {
     await handler.handleMessage({ author: { bot: false }, channel_id: 'chan_1', content: '!stop' });
     assert.strictEqual(sentMessages.length, 1);
     assert.ok(sentMessages[0].content.includes('Đã gửi lệnh dừng task'));
+
+    // Test 11: !sessions
+    mockRouter.getSessions = async () => ({
+        currentId: 'a3bb597f',
+        currentTitle: 'Higgsfield CLI',
+        sessions: [
+            { id: 'a3bb597f', title: 'Higgsfield CLI', active: true },
+            { id: '89e10449', title: 'General Greeting', active: false }
+        ]
+    });
+    sentMessages = [];
+    await handler.handleMessage({ author: { bot: false }, channel_id: 'chan_1', content: '!sessions' });
+    assert.strictEqual(sentMessages.length, 1);
+    assert.strictEqual(sentMessages[0].embed.title, '📂 Danh sách Sessions trong Antigravity');
+    assert.ok(sentMessages[0].embed.description.includes('Higgsfield CLI'));
+
+    // Test 12: !switch
+    mockRouter.switchSession = async (q) => ({ ok: true, session: { id: '89e10449', title: 'General Greeting' } });
+    sentMessages = [];
+    await handler.handleMessage({ author: { bot: false }, channel_id: 'chan_1', content: '!switch 89e10449' });
+    assert.strictEqual(sentMessages.length, 1);
+    assert.strictEqual(sentMessages[0].embed.title, '🔀 Đã chuyển phiên làm việc thành công!');
 
     console.log('DiscordCommandHandler self-check: PASS');
 }

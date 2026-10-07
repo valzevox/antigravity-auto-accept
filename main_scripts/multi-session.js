@@ -253,7 +253,99 @@ class MultiSessionRouter {
     }
 
     /**
-     * Dispatch a user prompt into Antigravity input field and send it
+     * Get list of open sessions from Antigravity sidebar
+     */
+    async getSessions() {
+        let targetId = null;
+        for (const [id] of this.handler.connections) {
+            targetId = id;
+            break;
+        }
+        if (!targetId) return { currentId: null, currentTitle: null, sessions: [] };
+
+        const expr = `(() => {
+            const pathname = window.location.pathname;
+            const currentId = pathname.replace('/c/', '').split('?')[0];
+
+            const links = Array.from(document.querySelectorAll('a[href*="/c/"]')).map(a => {
+                const href = a.getAttribute('href') || '';
+                const id = href.replace('/c/', '').split('?')[0];
+                let title = a.getAttribute('aria-label') ||
+                            a.querySelector('span, div')?.textContent?.trim() ||
+                            a.textContent?.trim() ||
+                            id.slice(0, 8);
+                title = title.replace(/\\s+/g, ' ').trim();
+                return { id, title, active: id === currentId };
+            });
+
+            const unique = [];
+            const seen = new Set();
+            for (const item of links) {
+                if (item.id && !seen.has(item.id)) {
+                    seen.add(item.id);
+                    unique.push(item);
+                }
+            }
+
+            return {
+                currentId,
+                currentTitle: unique.find(s => s.active)?.title || document.title,
+                sessions: unique
+            };
+        })()`;
+
+        const res = await this.evalPage(targetId, expr);
+        return res || { currentId: null, currentTitle: null, sessions: [] };
+    }
+
+    /**
+     * Switch Antigravity view to a specific session by ID or name
+     */
+    async switchSession(query) {
+        if (!query || !query.trim()) return { ok: false, error: 'Vui lòng cung cấp ID hoặc tên session' };
+        const q = query.trim().toLowerCase();
+
+        let targetId = null;
+        for (const [id] of this.handler.connections) {
+            targetId = id;
+            break;
+        }
+        if (!targetId) return { ok: false, error: 'Antigravity CDP chưa kết nối' };
+
+        const { sessions } = await this.getSessions();
+        if (!sessions || sessions.length === 0) {
+            return { ok: false, error: 'Không tìm thấy danh sách session nào trong Antigravity' };
+        }
+
+        const match = sessions.find(s => 
+            s.id.toLowerCase() === q ||
+            s.id.toLowerCase().startsWith(q) ||
+            s.title.toLowerCase().includes(q)
+        );
+
+        if (!match) {
+            return {
+                ok: false,
+                error: `Không tìm thấy session nào khớp với "${query}". Dùng \`!sessions\` để xem danh sách.`
+            };
+        }
+
+        const navExpr = `(() => {
+            if (window.__TSR_ROUTER__) {
+                window.__TSR_ROUTER__.navigate({ to: '/c/' + ${JSON.stringify(match.id)} });
+                return true;
+            }
+            return false;
+        })()`;
+
+        await this.evalPage(targetId, navExpr);
+        await sleep(500);
+
+        return { ok: true, session: match };
+    }
+
+    /**
+     * Dispatch a user prompt into Antigravity input field and send it using native CDP events
      */
     async sendPrompt(text, newSession = false) {
         if (!text || !text.trim()) return { ok: false, error: 'Nội dung prompt trống' };
@@ -264,63 +356,90 @@ class MultiSessionRouter {
         }
         if (!targetId) return { ok: false, error: 'Antigravity CDP chưa kết nối' };
 
-        const expr = `(async () => {
+        try {
+            if (newSession) {
+                await this.evalPage(targetId, `window.__TSR_ROUTER__ && window.__TSR_ROUTER__.navigate({ to: '/' })`);
+                await sleep(800);
+            }
+
+            // Step 1: Focus editor and clean existing content
+            await this.evalPage(targetId, `(() => {
+                const editor = document.querySelector('[contenteditable="true"]');
+                if (editor) {
+                    editor.focus();
+                    const sel = window.getSelection();
+                    sel.selectAllChildren(editor);
+                }
+            })()`);
+
+            // Step 2: Clear with real Backspace
             try {
-                if (${newSession} && window.__TSR_ROUTER__) {
-                    await window.__TSR_ROUTER__.navigate({ to: '/' });
-                    await new Promise(r => setTimeout(r, 600));
-                }
+                await this.handler._pressKey(targetId, 'Backspace');
+            } catch (e) {}
 
-                // Find input textarea or contenteditable
-                const textarea = document.querySelector('textarea, [contenteditable="true"]');
-                if (!textarea) return { ok: false, error: 'Không tìm thấy khung chat trong Antigravity' };
+            // Step 3: Insert text via CDP native Input.insertText
+            let insertedViaCdp = false;
+            try {
+                await this.handler._insertText(targetId, text);
+                insertedViaCdp = true;
+            } catch (e) {
+                this.log(`[SendPrompt] _insertText failed: ${e.message}`);
+            }
 
-                textarea.focus();
-                if (textarea.tagName.toLowerCase() === 'textarea') {
-                    // Bypass React controlled input cache
-                    const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
-                    if (nativeSetter) {
-                        nativeSetter.call(textarea, ${JSON.stringify(text)});
-                    } else {
-                        textarea.value = ${JSON.stringify(text)};
+            // Step 4: Ensure DOM has the text and fire input events
+            await this.evalPage(targetId, `(() => {
+                const editor = document.querySelector('[contenteditable="true"]');
+                if (editor) {
+                    if (!editor.textContent || editor.textContent.trim().length === 0) {
+                        editor.textContent = ${JSON.stringify(text)};
                     }
-                    textarea.dispatchEvent(new Event('input', { bubbles: true }));
-                    textarea.dispatchEvent(new Event('change', { bubbles: true }));
-                } else {
-                    textarea.textContent = ${JSON.stringify(text)};
-                    textarea.dispatchEvent(new InputEvent('input', { bubbles: true, data: ${JSON.stringify(text)} }));
+                    editor.dispatchEvent(new InputEvent('input', { bubbles: true, data: ${JSON.stringify(text)} }));
+                    editor.dispatchEvent(new Event('change', { bubbles: true }));
                 }
+            })()`);
 
-                await new Promise(r => setTimeout(r, 300));
+            await sleep(250);
 
-                // Find send button
-                const buttons = Array.from(document.querySelectorAll('button'));
-                const sendBtn = buttons.find(b => {
-                    const label = (b.getAttribute('aria-label') || '').toLowerCase();
-                    const bText = (b.textContent || '').toLowerCase().trim();
+            // Step 5: Click send button inside chat card
+            const clickRes = await this.evalPage(targetId, `(() => {
+                const editor = document.querySelector('[contenteditable="true"]');
+                if (!editor) return { clicked: false, error: 'No editor' };
+
+                const card = editor.closest('.bg-card-border') || editor.parentElement?.parentElement;
+                if (!card) return { clicked: false, error: 'No card container' };
+
+                // Look for send button in card
+                const sendBtn = Array.from(card.querySelectorAll('button')).find(b => {
+                    const aria = (b.getAttribute('aria-label') || '').toLowerCase();
+                    const tooltip = (b.getAttribute('data-tooltip-id') || '').toLowerCase();
                     return !b.disabled && (
-                        label.includes('send') || 
-                        label.includes('gửi') || 
-                        bText === 'send' || 
-                        bText === 'gửi' ||
-                        b.querySelector('svg')
+                        aria.includes('send') ||
+                        tooltip.includes('input-send-button') ||
+                        aria.includes('gửi')
                     );
                 });
 
                 if (sendBtn) {
                     sendBtn.click();
-                    return { ok: true, method: 'button' };
-                } else {
-                    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
-                    return { ok: true, method: 'enter' };
+                    return { clicked: true, method: 'button-click' };
                 }
-            } catch (err) {
-                return { ok: false, error: err.message };
-            }
-        })()`;
+                return { clicked: false };
+            })()`);
 
-        const res = await this.evalPage(targetId, expr);
-        return res || { ok: false, error: 'Không thể thực thi script trong webview' };
+            // Step 6: Dispatch native CDP Enter key to guarantee submission
+            await this.handler._pressKey(targetId, 'Enter');
+
+            // Get session info for response
+            const info = await this.getSessions();
+
+            return {
+                ok: true,
+                session: info.sessions.find(s => s.active) || { id: info.currentId, title: info.currentTitle },
+                method: clickRes && clickRes.clicked ? clickRes.method : 'cdp-enter'
+            };
+        } catch (err) {
+            return { ok: false, error: err.message };
+        }
     }
 
     /**
@@ -339,12 +458,14 @@ class MultiSessionRouter {
             const stopBtn = buttons.find(b => {
                 const label = (b.getAttribute('aria-label') || '').toLowerCase();
                 const bText = (b.textContent || '').toLowerCase().trim();
+                const tooltip = (b.getAttribute('data-tooltip-id') || '').toLowerCase();
                 return !b.disabled && (
                     label.includes('stop') || 
                     label.includes('cancel') || 
                     label.includes('dừng') ||
                     bText.includes('stop') || 
-                    bText.includes('dừng')
+                    bText.includes('dừng') ||
+                    tooltip.includes('cancel-tooltip')
                 );
             });
             if (stopBtn) {

@@ -1,4 +1,4 @@
-﻿const WebSocket = require('ws');
+const WebSocket = require('ws');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -515,7 +515,59 @@ class CDPHandler {
         });
     }
 
-    getConnectionCount() { 
+    /** CDP-native text insertion — bypasses React controlled input because the event is trusted. */
+    async _insertText(id, text, sessionId = null) {
+        await this._send(id, 'Input.insertText', { text }, sessionId);
+    }
+
+    async _clearEditor(id, sessionId = null) {
+        await this._evaluate(id, `(() => {
+            const editor = document.querySelector('[contenteditable="true"]');
+            if (!editor) return;
+            editor.focus();
+            const sel = window.getSelection();
+            sel.selectAllChildren(editor);
+        })()`, sessionId);
+        await this._pressKey(id, 'Backspace', sessionId);
+    }
+
+    /** Dispatch a real key press (keyDown + keyUp) via CDP so frameworks receive trusted events. */
+    async _pressKey(id, key, sessionId = null) {
+        const codes = {
+            Enter: { vk: 13, code: 'Enter', text: '\r' },
+            Backspace: { vk: 8, code: 'Backspace' }
+        };
+        const info = codes[key];
+        if (!info) throw new Error(`Unsupported key: ${key}`);
+
+        const base = {
+            key,
+            code: info.code,
+            windowsVirtualKeyCode: info.vk,
+            nativeVirtualKeyCode: info.vk
+        };
+
+        await this._send(id, 'Input.dispatchKeyEvent', {
+            ...base,
+            type: info.text ? 'keyDown' : 'rawKeyDown'
+        }, sessionId);
+
+        if (info.text) {
+            await this._send(id, 'Input.dispatchKeyEvent', {
+                ...base,
+                type: 'char',
+                text: info.text,
+                unmodifiedText: info.text
+            }, sessionId);
+        }
+
+        await this._send(id, 'Input.dispatchKeyEvent', {
+            ...base,
+            type: 'keyUp'
+        }, sessionId);
+    }
+
+    getConnectionCount() {
         let count = this.connections.size;
         for (const conn of this.connections.values()) {
             count += conn.childSessions?.size || 0;

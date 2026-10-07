@@ -65,6 +65,14 @@ class DiscordCommandHandler {
             case 'cancel':
                 await this.cmdStop(message);
                 break;
+            case 'sessions':
+            case 'ls':
+                await this.cmdSessions(message);
+                break;
+            case 'switch':
+            case 'go':
+                await this.cmdSwitch(message, args.join(' '));
+                break;
             case 'status':
                 await this.cmdStatus(message);
                 break;
@@ -98,7 +106,9 @@ class DiscordCommandHandler {
                 { name: '`!prompt <nội dung>` hoặc `!message <nội dung>`', value: '🚀 **Gửi prompt trực tiếp vào Antigravity** để Agent thực thi!', inline: false },
                 { name: '`!new <nội dung>`', value: '✨ Mở phiên chat mới và gửi prompt thực thi.', inline: false },
                 { name: '`!stop`', value: '🛑 Dừng khẩn cấp task đang chạy trong Antigravity.', inline: false },
-                { name: '`!status`', value: 'Kiểm tra trạng thái CDP & background daemon.', inline: false },
+                { name: '`!sessions`', value: '📂 Xem danh sách các phiên trò chuyện & session đang mở.', inline: false },
+                { name: '`!switch <id hoặc tên>`', value: '🔀 Chuyển Antigravity sang session được chỉ định.', inline: false },
+                { name: '`!status`', value: 'Kiểm tra trạng thái CDP, session đang mở & daemon.', inline: false },
                 { name: '`!config`', value: 'Xem cấu hình hiện tại (kênh gửi, chế độ ping).', inline: false },
                 { name: '`!setchannel <#kênh hoặc ID>`', value: 'Đổi kênh bot sẽ gửi thông báo và câu hỏi.', inline: false },
                 { name: '`!setping <@user | here | everyone | off>`', value: 'Cấu hình ai sẽ được ping khi có câu hỏi / hoàn tất task.', inline: false },
@@ -145,9 +155,61 @@ class DiscordCommandHandler {
         }
     }
 
+    async cmdSessions(message) {
+        const info = await this.router.getSessions();
+        const { currentId, currentTitle, sessions } = info || {};
+
+        if (!sessions || sessions.length === 0) {
+            return this.reply(message.channel_id, '⚠️ Không tìm thấy danh sách session nào (hoặc Antigravity đang đóng).');
+        }
+
+        const lines = sessions.slice(0, 15).map((s, idx) => {
+            const prefix = s.active ? '👉 **[ACTIVE]**' : `\`${idx + 1}.\``;
+            const shortId = s.id ? s.id.slice(0, 8) : 'unknown';
+            return `${prefix} **${s.title}**\n   └ ID: \`${shortId}\` (\`${s.id}\`)`;
+        });
+
+        const embed = {
+            title: '📂 Danh sách Sessions trong Antigravity',
+            description: lines.join('\n\n'),
+            color: 0x5865F2,
+            fields: [
+                {
+                    name: '💡 Chuyển đổi session',
+                    value: 'Dùng lệnh `!switch <id>` hoặc `!switch <tên>` để chuyển Antigravity sang session đó!'
+                }
+            ],
+            footer: { text: `Đang mở: ${currentTitle || currentId || 'N/A'}` }
+        };
+
+        await this.reply(message.channel_id, '', embed);
+    }
+
+    async cmdSwitch(message, query) {
+        if (!query || !query.trim()) {
+            return this.reply(message.channel_id, '❌ Cách dùng: `!switch <ID hoặc tên session>`\nVí dụ: `!switch 89e10449` hoặc `!switch Higgsfield`\n*(Dùng `!sessions` để xem danh sách)*');
+        }
+
+        const res = await this.router.switchSession(query);
+        if (res && res.ok) {
+            const s = res.session;
+            const embed = {
+                title: '🔀 Đã chuyển phiên làm việc thành công!',
+                description: `**Session:** ${s.title}\n**ID:** \`${s.id}\``,
+                color: 0x10B981,
+                footer: { text: 'Antigravity đã chuyển sang tab này trên máy tính!' }
+            };
+            await this.reply(message.channel_id, '', embed);
+        } else {
+            await this.reply(message.channel_id, `❌ ${res?.error || 'Không thể chuyển session'}`);
+        }
+    }
+
     async cmdStatus(message) {
-        const isConnected = this.router?.cdp?.connected || false;
-        const currentPath = this.router?.currentSessionPath || 'N/A';
+        const isConnected = this.router?.cdp?.connected || (this.router?.handler?.connections?.size > 0);
+        const info = await this.router.getSessions();
+        const activeName = info?.currentTitle || 'N/A';
+        const activeId = info?.currentId ? `\`${info.currentId.slice(0, 8)}...\`` : 'N/A';
         const guildId = this.gateway.guildId;
         const channelId = this.gateway.channelId;
 
@@ -156,11 +218,11 @@ class DiscordCommandHandler {
             color: isConnected ? 0x10B981 : 0xEF4444,
             fields: [
                 { name: 'Antigravity CDP', value: isConnected ? '🟢 Connected' : '🔴 Disconnected', inline: true },
-                { name: 'Active Session Path', value: `\`${currentPath}\``, inline: true },
+                { name: 'Active Session', value: `**${activeName}**\n(${activeId})`, inline: true },
                 { name: 'Target Channel', value: `<#${channelId}> (\`${channelId}\`)`, inline: false },
                 { name: 'Guild ID', value: `\`${guildId}\``, inline: true }
             ],
-            footer: { text: 'Antigravity 2.0' },
+            footer: { text: 'Antigravity 2.0 • 2-Way Controller' },
             timestamp: new Date().toISOString()
         };
         await this.reply(message.channel_id, '', embed);

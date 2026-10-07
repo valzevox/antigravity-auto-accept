@@ -194,6 +194,8 @@ Manage Antigravity directly from Discord — both receive notifications AND send
 | `!ask <text>` | Alias of `!prompt` | `!ask summarize this repo` |
 | `!new <text>` | Open a fresh Antigravity session, then send the prompt | `!new refactor auth module` |
 | `!stop` | Emergency stop the currently running task | `!stop` |
+| `!sessions` | **List open sessions & highlights active session** | `!sessions` |
+| `!switch <id \| name>` | **Switch Antigravity to another session by ID or name** | `!switch 89e10449` / `!switch Higgsfield` |
 | `!status` | Check Antigravity CDP connection & active session | `!status` |
 | `!config` | View active notification channel & ping settings | `!config` |
 | `!setchannel <#channel \| id>` | Change notification & prompt channel live | `!setchannel #agent-logs` |
