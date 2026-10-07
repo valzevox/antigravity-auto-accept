@@ -132,7 +132,8 @@ run.bat
 | Command | Description |
 | :--- | :--- |
 | `setup.bat` | Full 1-click setup: install, patch shortcuts, register startup, run daemon |
-| `run.bat` | Start or restart the background daemon |
+| `run.bat` | Start or restart the background daemon (headless, via Scheduled Task) |
+| `run-win11.bat` | **Windows 11**: Start or restart the daemon with a **visible popup Console window** so you can watch logs live |
 | `status.bat` | Check if the daemon is running and CDP is connected |
 | `node daemon.js` | Run daemon in foreground (for debugging) |
 | `node test-multi-session.js` | Run self-test for Multi-Session Auto-Router detection |
