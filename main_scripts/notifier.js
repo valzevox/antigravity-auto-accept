@@ -270,28 +270,145 @@ class Notifier {
 
         // Discord Bot channel: full interactive support with buttons + user ping on Case 1 & Case 2.
         if (this.gateway && discordBot.token && discordBot.channelId) {
-            jobs.push(this.gateway.sendMessageWithButtons(msg.embed, options, payload.session || '', mention));
+            jobs.push(this.gateway.sendMessageWithButtons(msg.embed, options, payload.session || '', mention, payload.imageBuffer || null));
         }
 
         if (discord) {
             const hookMention = mention ? `${mention}\n` : '';
             const brand = getBrand();
-            jobs.push(this.post(discord, {
-                username: brand.name,
-                avatar_url: brand.avatar,
-                content: hookMention || undefined,
-                embeds: [msg.embed]
-            }));
+            if (payload.imageBuffer) {
+                // Discord Webhook multipart upload with attachment
+                const boundary = '----WebhookBoundary' + Date.now().toString(16);
+                const hookEmbed = { ...msg.embed, image: { url: 'attachment://screenshot.png' } };
+                const payloadJson = {
+                    username: brand.name,
+                    avatar_url: brand.avatar,
+                    content: hookMention || undefined,
+                    embeds: [hookEmbed]
+                };
+                const chunks = [
+                    Buffer.from(
+                        `--${boundary}\r\n` +
+                        `Content-Disposition: form-data; name="payload_json"\r\n` +
+                        `Content-Type: application/json\r\n\r\n` +
+                        JSON.stringify(payloadJson) + `\r\n`
+                    ),
+                    Buffer.from(
+                        `--${boundary}\r\n` +
+                        `Content-Disposition: form-data; name="files[0]"; filename="screenshot.png"\r\n` +
+                        `Content-Type: image/png\r\n\r\n`
+                    ),
+                    Buffer.isBuffer(payload.imageBuffer) ? payload.imageBuffer : Buffer.from(payload.imageBuffer),
+                    Buffer.from(`\r\n--${boundary}--\r\n`)
+                ];
+                const multipartBody = Buffer.concat(chunks);
+                jobs.push(new Promise((resolve) => {
+                    try {
+                        const parsed = url.parse(discord);
+                        const lib = parsed.protocol === 'http:' ? http : https;
+                        const req = lib.request(parsed, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': `multipart/form-data; boundary=${boundary}`,
+                                'Content-Length': multipartBody.length
+                            },
+                            timeout: 8000
+                        }, (res) => {
+                            let raw = '';
+                            res.on('data', c => raw += c);
+                            res.on('end', () => resolve(res.statusCode >= 200 && res.statusCode < 300));
+                        });
+                        req.on('error', () => resolve(false));
+                        req.on('timeout', () => { req.destroy(); resolve(false); });
+                        req.write(multipartBody);
+                        req.end();
+                    } catch (e) {
+                        resolve(false);
+                    }
+                }));
+            } else {
+                jobs.push(this.post(discord, {
+                    username: brand.name,
+                    avatar_url: brand.avatar,
+                    content: hookMention || undefined,
+                    embeds: [msg.embed]
+                }));
+            }
         }
 
         if (telegram.botToken && telegram.chatId) {
-            jobs.push(this.post(`https://api.telegram.org/bot${telegram.botToken}/sendMessage`, {
-                chat_id: telegram.chatId,
-                text: msg.telegramText,
-                parse_mode: 'HTML',
-                disable_web_page_preview: true,
-                reply_markup: msg.replyMarkup
-            }).then((r) => (r && r.result ? r.result.message_id : null)));
+            if (payload.imageBuffer) {
+                // Telegram sendPhoto with multipart/form-data
+                const boundary = '----TgBoundary' + Date.now().toString(16);
+                const caption = (msg.telegramText || '').slice(0, 1024); // Telegram caption limit 1024
+                const chunks = [
+                    Buffer.from(
+                        `--${boundary}\r\n` +
+                        `Content-Disposition: form-data; name="chat_id"\r\n\r\n` +
+                        `${telegram.chatId}\r\n` +
+                        `--${boundary}\r\n` +
+                        `Content-Disposition: form-data; name="caption"\r\n\r\n` +
+                        `${caption}\r\n` +
+                        `--${boundary}\r\n` +
+                        `Content-Disposition: form-data; name="parse_mode"\r\n\r\n` +
+                        `HTML\r\n`
+                    )
+                ];
+                if (msg.replyMarkup) {
+                    chunks.push(Buffer.from(
+                        `--${boundary}\r\n` +
+                        `Content-Disposition: form-data; name="reply_markup"\r\n\r\n` +
+                        `${JSON.stringify(msg.replyMarkup)}\r\n`
+                    ));
+                }
+                chunks.push(Buffer.from(
+                    `--${boundary}\r\n` +
+                    `Content-Disposition: form-data; name="photo"; filename="screenshot.png"\r\n` +
+                    `Content-Type: image/png\r\n\r\n`
+                ));
+                chunks.push(Buffer.isBuffer(payload.imageBuffer) ? payload.imageBuffer : Buffer.from(payload.imageBuffer));
+                chunks.push(Buffer.from(`\r\n--${boundary}--\r\n`));
+                const tgBody = Buffer.concat(chunks);
+
+                jobs.push(new Promise((resolve) => {
+                    try {
+                        const parsed = url.parse(`https://api.telegram.org/bot${telegram.botToken}/sendPhoto`);
+                        const req = https.request(parsed, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': `multipart/form-data; boundary=${boundary}`,
+                                'Content-Length': tgBody.length
+                            },
+                            timeout: 10000
+                        }, (res) => {
+                            let raw = '';
+                            res.on('data', c => raw += c);
+                            res.on('end', () => {
+                                try {
+                                    const json = JSON.parse(raw);
+                                    resolve(json?.result?.message_id || null);
+                                } catch (e) {
+                                    resolve(null);
+                                }
+                            });
+                        });
+                        req.on('error', () => resolve(null));
+                        req.on('timeout', () => { req.destroy(); resolve(null); });
+                        req.write(tgBody);
+                        req.end();
+                    } catch (e) {
+                        resolve(null);
+                    }
+                }));
+            } else {
+                jobs.push(this.post(`https://api.telegram.org/bot${telegram.botToken}/sendMessage`, {
+                    chat_id: telegram.chatId,
+                    text: msg.telegramText,
+                    parse_mode: 'HTML',
+                    disable_web_page_preview: true,
+                    reply_markup: msg.replyMarkup
+                }).then((r) => (r && r.result ? r.result.message_id : null)));
+            }
         }
 
         if (customUrl) {

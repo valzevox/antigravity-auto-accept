@@ -569,6 +569,44 @@ class CDPHandler {
         }, sessionId);
     }
 
+    /**
+     * Capture high-precision DOM element screenshot via CDP Page.captureScreenshot clip.
+     * Takes screenshot directly from Antigravity renderer canvas, completely immune to Alt-Tab or window occlusion.
+     * @param {string} targetId CDP target ID
+     * @param {string} elementSelectorExpr JavaScript expression returning bounding rect { x, y, width, height }
+     * @param {string|null} sessionId Child session ID
+     * @returns {Promise<Buffer|null>} PNG image buffer
+     */
+    async captureElementScreenshot(targetId, elementSelectorExpr, sessionId = null) {
+        try {
+            const clipRes = await this._evaluate(targetId, elementSelectorExpr, sessionId);
+            const clip = clipRes?.result?.value;
+            if (!clip || !clip.width || !clip.height || clip.width <= 0 || clip.height <= 0) {
+                return null;
+            }
+
+            const safeClip = {
+                x: Math.max(0, Math.floor(clip.x)),
+                y: Math.max(0, Math.floor(clip.y)),
+                width: Math.ceil(clip.width),
+                height: Math.ceil(clip.height),
+                scale: 1
+            };
+
+            const screenshotRes = await this._send(targetId, 'Page.captureScreenshot', {
+                format: 'png',
+                clip: safeClip
+            }, sessionId);
+
+            if (screenshotRes?.data) {
+                return Buffer.from(screenshotRes.data, 'base64');
+            }
+            return null;
+        } catch (e) {
+            return null;
+        }
+    }
+
     getConnectionCount() {
         let count = this.connections.size;
         for (const conn of this.connections.values()) {

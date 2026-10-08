@@ -114,7 +114,7 @@ class MultiSessionRouter {
     }
 
     /** @returns {string|null} conversation id awaiting approval, or null */
-    findPending() {
+    async findPending() {
         let ids;
         try {
             ids = fs.readdirSync(this.brainDir);
@@ -209,11 +209,18 @@ class MultiSessionRouter {
                         promptText = typeof qCall?.args === 'string' ? qCall.args : JSON.stringify(qCall?.args || {});
                     }
 
+                    // Capture CDP element screenshot of the question card/dialog
+                    let imageBuffer = null;
+                    try {
+                        imageBuffer = await this.captureQuestionScreenshot(id);
+                    } catch (e) {}
+
                     this.notifier.notify(1, {
                         session: id,
                         summary: promptText || 'Agent đang chờ bạn đưa ra quyết định.',
                         details: promptText,
-                        options
+                        options,
+                        imageBuffer
                     });
                 }
                 continue;
@@ -245,9 +252,17 @@ class MultiSessionRouter {
                         const safe = lastNl > 2200 ? cut.slice(0, lastNl) : cut;
                         content = `${safe.trim()}\n\n*... (Xem chi tiết đầy đủ trong Antigravity)*`;
                     }
+
+                    // Capture CDP element screenshot of the completed turn response
+                    let imageBuffer = null;
+                    try {
+                        imageBuffer = await this.captureResponseScreenshot(id);
+                    } catch (e) {}
+
                     this.notifier.notify(2, {
                         session: id,
-                        summary: content
+                        summary: content,
+                        imageBuffer
                     });
                     if (this.loadingWatcher) {
                         this.loadingWatcher.finishSession(id, content, false);
@@ -358,7 +373,7 @@ class MultiSessionRouter {
         try {
             await this.checkRetryWarnings();
 
-            const pending = this.findPending();
+            const pending = await this.findPending();
             if (!pending) return;
 
             const from = await this.currentPath();
@@ -612,6 +627,157 @@ class MultiSessionRouter {
 
         const res = await this.evalPage(targetId, expr);
         return res || { ok: false, error: 'Không thể thực thi script' };
+    }
+
+    /**
+     * Target connection ID helper
+     */
+    _getTargetId() {
+        for (const [id] of this.handler.connections) {
+            return id;
+        }
+        return null;
+    }
+
+    /**
+     * Capture screenshot of completed assistant turn response element.
+     * Guaranteed DOM-direct via CDP Page.captureScreenshot clip (never Alt-Tabbed or occluded).
+     * @param {string} sessionId Session ID
+     * @returns {Promise<Buffer|null>} PNG image buffer
+     */
+    async captureResponseScreenshot(sessionId) {
+        const targetId = this._getTargetId();
+        if (!targetId) return null;
+
+        const expr = `(() => {
+            const pathname = window.location.pathname;
+            const curSession = pathname.replace('/c/', '').split('?')[0];
+            if (curSession !== ${JSON.stringify(sessionId)}) return null;
+
+            // Locate conversation turns in Antigravity chat
+            const turns = Array.from(document.querySelectorAll('.flex.flex-col.gap-0\\\\.5.group.w-full'));
+            if (!turns.length) return null;
+
+            // Pick the last completed turn
+            for (let i = turns.length - 1; i >= 0; i--) {
+                const turn = turns[i];
+                // Check if turn contains assistant response
+                let target = turn.querySelector('.leading-relaxed.select-text.text-sm');
+                if (!target) {
+                    target = turn.querySelector('div[class*="markdown"], div[class*="prose"]');
+                }
+                if (!target) {
+                    // Fallback to turn container itself excluding user sticky header if present
+                    const sticky = turn.querySelector('.sticky.top-0');
+                    if (sticky && sticky.nextElementSibling) {
+                        target = sticky.nextElementSibling;
+                    } else {
+                        target = turn;
+                    }
+                }
+
+                if (target) {
+                    try {
+                        target.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+                    } catch (e) {}
+                    const r = target.getBoundingClientRect();
+                    if (r.width > 20 && r.height > 20) {
+                        return {
+                            x: Math.max(0, Math.floor(r.x)),
+                            y: Math.max(0, Math.floor(r.y)),
+                            width: Math.ceil(r.width),
+                            height: Math.ceil(r.height),
+                            scale: 1
+                        };
+                    }
+                }
+            }
+            return null;
+        })()`;
+
+        return this.handler.captureElementScreenshot(targetId, expr);
+    }
+
+    /**
+     * Capture screenshot of question / tool approval dialog or interactive question card.
+     * Guaranteed DOM-direct via CDP Page.captureScreenshot clip (never Alt-Tabbed or occluded).
+     * @param {string} sessionId Session ID
+     * @returns {Promise<Buffer|null>} PNG image buffer
+     */
+    async captureQuestionScreenshot(sessionId) {
+        const targetId = this._getTargetId();
+        if (!targetId) return null;
+
+        const expr = `(() => {
+            const pathname = window.location.pathname;
+            const curSession = pathname.replace('/c/', '').split('?')[0];
+            if (curSession !== ${JSON.stringify(sessionId)}) return null;
+
+            // Look for radio/question card first
+            const radios = Array.from(document.querySelectorAll('[role="radio"], [role="option"], input[type="radio"], [role="radiogroup"]'));
+            if (radios.length) {
+                const card = radios[0].closest('[role="dialog"], [class*="modal"], [class*="card"], div.border, div.rounded') || radios[0].parentElement?.parentElement;
+                if (card) {
+                    try {
+                        card.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+                    } catch (e) {}
+                    const r = card.getBoundingClientRect();
+                    if (r.width > 30 && r.height > 30) {
+                        return {
+                            x: Math.max(0, Math.floor(r.x)),
+                            y: Math.max(0, Math.floor(r.y)),
+                            width: Math.ceil(r.width),
+                            height: Math.ceil(r.height),
+                            scale: 1
+                        };
+                    }
+                }
+            }
+
+            // Look for modal/dialog/tool card
+            const dialogs = Array.from(document.querySelectorAll('[role="dialog"], [class*="dialog"], [class*="modal"], [data-testid*="tool-call"]'));
+            for (const d of dialogs) {
+                const t = (d.textContent || '').toLowerCase();
+                if (t.includes('submit') || t.includes('allow') || t.includes('choice') || t.includes('question') || t.includes('options')) {
+                    try {
+                        d.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+                    } catch (e) {}
+                    const r = d.getBoundingClientRect();
+                    if (r.width > 30 && r.height > 30) {
+                        return {
+                            x: Math.max(0, Math.floor(r.x)),
+                            y: Math.max(0, Math.floor(r.y)),
+                            width: Math.ceil(r.width),
+                            height: Math.ceil(r.height),
+                            scale: 1
+                        };
+                    }
+                }
+            }
+
+            // Fallback: the last turn in chat
+            const turns = Array.from(document.querySelectorAll('.flex.flex-col.gap-0\\\\.5.group.w-full'));
+            if (turns.length) {
+                const lastTurn = turns[turns.length - 1];
+                try {
+                    lastTurn.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+                } catch (e) {}
+                const r = lastTurn.getBoundingClientRect();
+                if (r.width > 30 && r.height > 30) {
+                    return {
+                        x: Math.max(0, Math.floor(r.x)),
+                        y: Math.max(0, Math.floor(r.y)),
+                        width: Math.ceil(r.width),
+                        height: Math.ceil(r.height),
+                        scale: 1
+                    };
+                }
+            }
+
+            return null;
+        })()`;
+
+        return this.handler.captureElementScreenshot(targetId, expr);
     }
 }
 

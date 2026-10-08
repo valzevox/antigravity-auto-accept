@@ -280,9 +280,9 @@ class DiscordGatewayBridge {
     }
 
     /**
-     * Send rich embed message with interactive buttons to the configured Discord channel
+     * Send rich embed message with interactive buttons (and optional screenshot attachment) to the configured Discord channel
      */
-    async sendMessageWithButtons(embed, options = [], sessionId = '', content = '') {
+    async sendMessageWithButtons(embed, options = [], sessionId = '', content = '', imageBuffer = null) {
         if (!this.channelId || !this.token) return false;
 
         const payload = {
@@ -290,6 +290,10 @@ class DiscordGatewayBridge {
             embeds: [embed],
             components: []
         };
+
+        if (imageBuffer) {
+            embed.image = { url: 'attachment://screenshot.png' };
+        }
 
         if (options && options.length > 0 && sessionId) {
             // Discord allows max 5 buttons per action row
@@ -309,6 +313,15 @@ class DiscordGatewayBridge {
             });
         }
 
+        if (imageBuffer) {
+            return this.sendMultipartMessage(this.channelId, payload, [{
+                name: 'files[0]',
+                filename: 'screenshot.png',
+                contentType: 'image/png',
+                data: imageBuffer
+            }]);
+        }
+
         const data = JSON.stringify(payload);
         return new Promise((resolve) => {
             const req = https.request(`https://discord.com/api/v10/channels/${this.channelId}/messages`, {
@@ -325,6 +338,56 @@ class DiscordGatewayBridge {
             });
             req.on('error', () => resolve(false));
             req.write(data);
+            req.end();
+        });
+    }
+
+    /**
+     * Send multipart/form-data message to Discord channel (for attachments like screenshots)
+     */
+    async sendMultipartMessage(channelId, payloadJson, files = []) {
+        if (!channelId || !this.token) return false;
+
+        const boundary = '----AntigravityBoundary' + Date.now().toString(16);
+        const chunks = [];
+
+        // Add payload_json part
+        chunks.push(Buffer.from(
+            `--${boundary}\r\n` +
+            `Content-Disposition: form-data; name="payload_json"\r\n` +
+            `Content-Type: application/json\r\n\r\n` +
+            JSON.stringify(payloadJson) + `\r\n`
+        ));
+
+        // Add file parts
+        for (const file of files) {
+            chunks.push(Buffer.from(
+                `--${boundary}\r\n` +
+                `Content-Disposition: form-data; name="${file.name}"; filename="${file.filename}"\r\n` +
+                `Content-Type: ${file.contentType || 'application/octet-stream'}\r\n\r\n`
+            ));
+            chunks.push(Buffer.isBuffer(file.data) ? file.data : Buffer.from(file.data));
+            chunks.push(Buffer.from('\r\n'));
+        }
+
+        chunks.push(Buffer.from(`--${boundary}--\r\n`));
+        const bodyBuffer = Buffer.concat(chunks);
+
+        return new Promise((resolve) => {
+            const req = https.request(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bot ${this.token}`,
+                    'Content-Type': `multipart/form-data; boundary=${boundary}`,
+                    'Content-Length': bodyBuffer.length
+                }
+            }, (res) => {
+                let body = '';
+                res.on('data', (c) => body += c);
+                res.on('end', () => resolve(res.statusCode >= 200 && res.statusCode < 300));
+            });
+            req.on('error', () => resolve(false));
+            req.write(bodyBuffer);
             req.end();
         });
     }
