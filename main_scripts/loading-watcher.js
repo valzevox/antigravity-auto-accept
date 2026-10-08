@@ -177,14 +177,13 @@ class LoadingWatcher {
     }
 
     /**
-     * Find most recently active session on disk if CDP is not focused on it
+     * Find all active sessions on disk if CDP is not focused on them
      * Skips sessions that are already completed (last record is PLANNER_RESPONSE with status DONE)
      */
-    findRecentlyActiveSession() {
+    findRecentlyActiveSessions() {
         try {
             const ids = fs.readdirSync(this.brainDir);
-            let latest = null;
-            let latestMtime = 0;
+            const activeList = [];
             const now = Date.now();
 
             for (const id of ids) {
@@ -201,15 +200,12 @@ class LoadingWatcher {
                         continue;
                     }
 
-                    if (mtime > latestMtime) {
-                        latestMtime = mtime;
-                        latest = { id, mtimeMs: mtime };
-                    }
+                    activeList.push({ id, mtimeMs: mtime });
                 } catch (e) {}
             }
-            return latest;
+            return activeList;
         } catch (e) {
-            return null;
+            return [];
         }
     }
 
@@ -387,47 +383,50 @@ class LoadingWatcher {
         const gateway = this.router.notifier?.gateway;
         if (!gateway) return;
 
-        // 1. Auto-detect active running session if none is currently tracked
-        if (this.activeSessions.size === 0) {
-            try {
-                let isGenerating = false;
-                let activeId = null;
-                let activeTitle = null;
+        // 1. Auto-detect all active running sessions
+        try {
+            const runningSessions = new Map();
 
-                // Priority A: Check CDP for Cancel/Stop button
-                for (const [targetId] of this.router.handler.connections) {
-                    const status = await this.router.evalPage(targetId, `(() => {
-                        const hasCancel = !!document.querySelector('[data-tooltip-id*="cancel-tooltip"], button[aria-label*="Cancel"], button[aria-label*="Stop"]');
-                        const pathname = window.location.pathname || '';
-                        const id = pathname.replace('/c/', '').split('?')[0];
-                        return { hasCancel, id, title: document.title };
-                    })()`);
-                    if (status && status.hasCancel && status.id) {
-                        isGenerating = true;
-                        activeId = status.id;
-                        activeTitle = status.title;
-                        break;
+            // Priority A: Check CDP connections for Cancel/Stop button
+            for (const [targetId] of this.router.handler.connections) {
+                const status = await this.router.evalPage(targetId, `(() => {
+                    const hasCancel = !!document.querySelector('[data-tooltip-id*="cancel-tooltip"], button[aria-label*="Cancel"], button[aria-label*="Stop"]');
+                    const pathname = window.location.pathname || '';
+                    const id = pathname.replace('/c/', '').split('?')[0];
+                    return { hasCancel, id, title: document.title };
+                })()`);
+                if (status && status.hasCancel && status.id) {
+                    runningSessions.set(status.id, status.title);
+                }
+            }
+
+            // Priority B: Check disk for recently active sessions (transcript modified in last 15s)
+            const recentDiskSessions = this.findRecentlyActiveSessions();
+            for (const rec of recentDiskSessions) {
+                if (!runningSessions.has(rec.id)) {
+                    runningSessions.set(rec.id, null);
+                }
+            }
+
+            // Track any running session that is not yet in activeSessions
+            if (runningSessions.size > 0) {
+                let curSessions = null;
+                for (const [id, title] of runningSessions.entries()) {
+                    if (!this.activeSessions.has(id)) {
+                        let activeTitle = title;
+                        if (!activeTitle) {
+                            if (!curSessions) {
+                                curSessions = await this.router.getSessions().catch(() => null);
+                            }
+                            activeTitle = curSessions?.sessions?.find(s => s.id === id)?.title ||
+                                          curSessions?.currentTitle ||
+                                          `Session ${id.slice(0, 8)}`;
+                        }
+                        await this.trackSession(id, activeTitle);
                     }
                 }
-
-                // Priority B: Fallback check on disk (transcript modified in last 5s)
-                if (!isGenerating) {
-                    const recent = this.findRecentlyActiveSession();
-                    if (recent) {
-                        isGenerating = true;
-                        activeId = recent.id;
-                    }
-                }
-
-                if (isGenerating && activeId) {
-                    if (!activeTitle) {
-                        const cur = await this.router.getSessions();
-                        activeTitle = cur?.sessions?.find(s => s.id === activeId)?.title || cur?.currentTitle || `Session ${activeId.slice(0, 8)}`;
-                    }
-                    await this.trackSession(activeId, activeTitle);
-                }
-            } catch (e) {}
-        }
+            }
+        } catch (e) {}
 
         // 2. Update and lifecycle-manage all tracked active sessions
         for (const [sessionId, state] of this.activeSessions.entries()) {
@@ -454,33 +453,46 @@ class LoadingWatcher {
 
             // Check if session has finished generating
             let stillGenerating = false;
+            let cdpFoundForSession = false;
+
             for (const [targetId] of this.router.handler.connections) {
-                const isGen = await this.router.evalPage(targetId, `(() => {
-                    const hasCancel = !!document.querySelector('[data-tooltip-id*="cancel-tooltip"], button[aria-label*="Cancel"], button[aria-label*="Stop"]');
+                const res = await this.router.evalPage(targetId, `(() => {
                     const pathname = window.location.pathname || '';
                     const id = pathname.replace('/c/', '').split('?')[0];
-                    return hasCancel && (id === ${JSON.stringify(sessionId)} || !id);
+                    if (id === ${JSON.stringify(sessionId)}) {
+                        const hasCancel = !!document.querySelector('[data-tooltip-id*="cancel-tooltip"], button[aria-label*="Cancel"], button[aria-label*="Stop"]');
+                        return { matched: true, hasCancel };
+                    }
+                    return { matched: false };
                 })()`);
-                if (isGen) {
-                    stillGenerating = true;
+
+                if (res && res.matched) {
+                    cdpFoundForSession = true;
+                    if (res.hasCancel) {
+                        stillGenerating = true;
+                    }
                     break;
                 }
             }
 
-            // Anti-spam: skip if session already finished (dedup via finishedSteps)
-            if (this.finishedSteps.has(sessionId) && this.finishedSteps.get(sessionId) === live.lastStepIndex) {
-                if (state.messageId && state.channelId) {
-                    const embed = this.buildLoadingEmbed(state);
+            // Background session protection: If CDP is currently hopped or focused on a DIFFERENT session,
+            // never assume this session has finished unless its transcript on disk confirms completion!
+            if (!cdpFoundForSession) {
+                const transFile = path.join(this.brainDir, sessionId, '.system_generated', 'logs', 'transcript.jsonl');
+                if (fs.existsSync(transFile)) {
                     try {
-                        await gateway.editMessage(state.channelId, state.messageId, { embeds: [embed] });
-                    } catch (e) {
-                        this.log(`[LoadingWatcher] Failed to edit message: ${e.message}`);
-                    }
-                }
-                continue;
-            }
+                        const mtime = fs.statSync(transFile).mtimeMs;
+                        const lastRecord = this.getLastRecord(transFile);
+                        const isDoneRecord = lastRecord && lastRecord.type === 'PLANNER_RESPONSE' && lastRecord.status === 'DONE';
 
-            if (!stillGenerating) {
+                        // Still generating if recently modified (<10s) or last record is not DONE
+                        if (!isDoneRecord || (Date.now() - mtime < 5000)) {
+                            stillGenerating = true;
+                        }
+                    } catch (e) {}
+                }
+            } else if (!stillGenerating) {
+                // CDP focused but Stop button disappeared: double check disk recency
                 const transFile = path.join(this.brainDir, sessionId, '.system_generated', 'logs', 'transcript.jsonl');
                 if (fs.existsSync(transFile)) {
                     try {
@@ -490,6 +502,19 @@ class LoadingWatcher {
                         }
                     } catch (e) {}
                 }
+            }
+
+            // Anti-spam: skip if session already finished (dedup via finishedSteps)
+            if (this.finishedSteps.has(sessionId) && this.finishedSteps.get(sessionId) === live?.lastStepIndex) {
+                if (state.messageId && state.channelId) {
+                    const embed = this.buildLoadingEmbed(state);
+                    try {
+                        await gateway.editMessage(state.channelId, state.messageId, { embeds: [embed] });
+                    } catch (e) {
+                        this.log(`[LoadingWatcher] Failed to edit message: ${e.message}`);
+                    }
+                }
+                continue;
             }
 
             // Turn completed or aborted: auto-finish session card

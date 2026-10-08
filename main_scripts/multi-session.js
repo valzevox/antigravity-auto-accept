@@ -224,14 +224,14 @@ class MultiSessionRouter {
                 const doneContent = (last.content || '').trim();
                 const doneHash = hashContent(doneContent);
 
-                // Hopping between sessions re-touches the transcript file, so the
-                // step key alone cannot tell a new turn from the one already
-                // reported. Fall back to a content fingerprint + recency window.
+                // Hopping between sessions re-touches the transcript file.
+                // Dedup permanently on (stepId || contentHash), so returning to an already
+                // completed turn never re-fires completion notifications or ends loading cards again.
                 const prior = this.notifiedDone.get(id);
                 const isRepeat = prior && (
                     (prior.contentHash === doneHash) ||
                     (prior.stepId === stepId)
-                ) && (now - prior.timestamp) < DONE_DEDUP_MS;
+                );
 
                 if (!this.seenSteps.has(key) && !isRepeat) {
                     this.seenSteps.set(key, now);
