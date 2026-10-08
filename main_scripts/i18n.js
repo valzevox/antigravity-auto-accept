@@ -100,7 +100,17 @@ const DICTIONARIES = {
             langPromptTitle: '🌐 Chọn ngôn ngữ / Select Language',
             langPromptDesc: 'Chọn ngôn ngữ giao tiếp cho Bot Discord & Telegram:\nSelect your display language for the bot:',
             langSwitched: '✅ Đã chuyển ngôn ngữ sang **Tiếng Việt**!',
-            buttonSelected: (user, idx) => `✅ **@${user} đã chọn phương án ${idx}!** Đang áp dụng vào Antigravity...`
+            buttonSelected: (user, idx) => `✅ **@${user} đã chọn phương án ${idx}!** Đang áp dụng vào Antigravity...`,
+            btnVi: '🇻🇳 Tiếng Việt',
+            btnEn: '🇬🇧 English',
+            btnPause: '⏸️ Tạm dừng Auto-Accept',
+            btnResume: '▶️ Tiếp tục Auto-Accept',
+            btnStop: '🛑 Dừng Task Hiện Tại',
+            btnRetry: '🔄 Thử lại ngay (Retry)',
+            actionPaused: (user) => `⏸️ **@${user} đã tạm dừng Auto-Accept!**`,
+            actionResumed: (user) => `▶️ **@${user} đã bật lại Auto-Accept!**`,
+            actionStopped: (user) => `🛑 **@${user} đã gửi lệnh dừng task đang chạy!**`,
+            actionRetried: (user) => `🔄 **@${user} đã kích hoạt Retry thủ công!** Đang tìm và bấm Retry...`
         }
     },
     en: {
@@ -192,7 +202,17 @@ const DICTIONARIES = {
             langPromptTitle: '🌐 Select Language / Chọn ngôn ngữ',
             langPromptDesc: 'Select your display language for the bot:\nChọn ngôn ngữ giao tiếp cho Bot Discord & Telegram:',
             langSwitched: '✅ Language switched to **English**!',
-            buttonSelected: (user, idx) => `✅ **@${user} selected option ${idx}!** Applying in Antigravity...`
+            buttonSelected: (user, idx) => `✅ **@${user} selected option ${idx}!** Applying in Antigravity...`,
+            btnVi: '🇻🇳 Tiếng Việt',
+            btnEn: '🇬🇧 English',
+            btnPause: '⏸️ Pause Auto-Accept',
+            btnResume: '▶️ Resume Auto-Accept',
+            btnStop: '🛑 Stop Current Task',
+            btnRetry: '🔄 Retry Now',
+            actionPaused: (user) => `⏸️ **@${user} paused Auto-Accept!**`,
+            actionResumed: (user) => `▶️ **@${user} resumed Auto-Accept!**`,
+            actionStopped: (user) => `🛑 **@${user} requested emergency task stop!**`,
+            actionRetried: (user) => `🔄 **@${user} triggered manual retry!** Locating and clicking Retry...`
         }
     }
 };

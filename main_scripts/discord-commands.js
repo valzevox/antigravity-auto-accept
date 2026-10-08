@@ -352,7 +352,28 @@ class DiscordCommandHandler {
             ],
             footer: { text: t.twoWayFooter }
         };
-        await this.reply(message.channel_id, '', embed);
+        const payload = {
+            embeds: [embed],
+            components: [
+                {
+                    type: 1, // ActionRow 1: Language selection
+                    components: [
+                        { type: 2, style: 1, label: t.commands.btnVi || '🇻🇳 Tiếng Việt', custom_id: 'lang:vi' },
+                        { type: 2, style: 2, label: t.commands.btnEn || '🇬🇧 English', custom_id: 'lang:en' }
+                    ]
+                },
+                {
+                    type: 1, // ActionRow 2: Quick controls
+                    components: [
+                        { type: 2, style: 2, label: t.commands.btnPause || '⏸️ Tạm dừng', custom_id: 'act:pause' },
+                        { type: 2, style: 3, label: t.commands.btnResume || '▶️ Tiếp tục', custom_id: 'act:resume' },
+                        { type: 2, style: 4, label: t.commands.btnStop || '🛑 Dừng Task', custom_id: 'act:stop' },
+                        { type: 2, style: 1, label: t.commands.btnRetry || '🔄 Retry ngay', custom_id: 'act:retry' }
+                    ]
+                }
+            ]
+        };
+        await this.gateway.createRawMessage(message.channel_id, payload);
     }
 
     async cmdPrompt(message, promptText, isNew = false) {
@@ -491,7 +512,27 @@ class DiscordCommandHandler {
             ],
             footer: { text: t.commands.configFooter }
         };
-        await this.reply(message.channel_id, '', embed);
+        const payload = {
+            embeds: [embed],
+            components: [
+                {
+                    type: 1, // ActionRow 1: Language selection
+                    components: [
+                        { type: 2, style: 1, label: t.commands.btnVi || '🇻🇳 Tiếng Việt', custom_id: 'lang:vi' },
+                        { type: 2, style: 2, label: t.commands.btnEn || '🇬🇧 English', custom_id: 'lang:en' }
+                    ]
+                },
+                {
+                    type: 1, // ActionRow 2: Quick controls
+                    components: [
+                        { type: 2, style: 2, label: t.commands.btnPause || '⏸️ Tạm dừng', custom_id: 'act:pause' },
+                        { type: 2, style: 3, label: t.commands.btnResume || '▶️ Tiếp tục', custom_id: 'act:resume' },
+                        { type: 2, style: 4, label: t.commands.btnStop || '🛑 Dừng Task', custom_id: 'act:stop' }
+                    ]
+                }
+            ]
+        };
+        await this.gateway.createRawMessage(message.channel_id, payload);
     }
 
     async cmdLanguage(message, langChoice) {

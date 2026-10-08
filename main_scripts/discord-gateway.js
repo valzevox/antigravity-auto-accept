@@ -150,6 +150,63 @@ class DiscordGatewayBridge {
             return;
         }
 
+        // Handle quick action buttons: act:pause, act:resume, act:stop, act:retry
+        if (customId.startsWith('act:')) {
+            const action = customId.replace('act:', '');
+            const user = interaction.member?.user?.username || interaction.user?.username || 'User';
+            const { I18nManager } = require('./i18n');
+            const t = I18nManager.t();
+            let ackMsg = '';
+
+            if (action === 'pause') {
+                for (const [targetId] of this.router.handler.connections) {
+                    await this.router.handler._safeEvaluate(targetId, 'if(window.__autoAcceptStop) window.__autoAcceptStop()', 1);
+                }
+                ackMsg = t.commands.actionPaused(user);
+            } else if (action === 'resume') {
+                for (const [targetId] of this.router.handler.connections) {
+                    await this.router.handler._safeEvaluate(targetId, 'if(window.__autoAcceptStart) window.__autoAcceptStart()', 1);
+                }
+                ackMsg = t.commands.actionResumed(user);
+            } else if (action === 'stop') {
+                await this.router.stopCurrentTask();
+                ackMsg = t.commands.actionStopped(user);
+            } else if (action === 'retry') {
+                const expr = `(() => {
+                    const buttons = Array.from(document.querySelectorAll('button, [role="button"], a.monaco-button'));
+                    const btn = buttons.find(b => {
+                        if (b.disabled || b.getAttribute('aria-disabled') === 'true') return false;
+                        const t = (b.textContent || b.innerText || '').trim();
+                        const aria = (b.getAttribute('aria-label') || '').trim();
+                        const title = (b.getAttribute('title') || '').trim();
+                        return /^(retry|try again|thử lại)(\\b|$)/i.test(t) ||
+                               /^(retry|try again)(\\b|$)/i.test(aria) ||
+                               /^(retry|try again)(\\b|$)/i.test(title) ||
+                               /continue generating/i.test(t);
+                    });
+                    if (btn) {
+                        btn.click();
+                        return { ok: true };
+                    }
+                    return { ok: false };
+                })()`;
+                for (const [targetId] of this.router.handler.connections) {
+                    await this.router.handler._evaluate(targetId, expr);
+                    break;
+                }
+                ackMsg = t.commands.actionRetried(user);
+            }
+
+            await this.respondInteraction(interaction.id, interaction.token, {
+                type: 7,
+                data: {
+                    content: ackMsg,
+                    components: []
+                }
+            });
+            return;
+        }
+
         const match = customId.match(/^ans:([a-zA-Z0-9_-]+):(\d+)$/);
         if (!match) return;
 
