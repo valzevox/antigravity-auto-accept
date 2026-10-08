@@ -250,15 +250,25 @@
                 const rect = el.getBoundingClientRect();
                 if (rect.width === 0 || rect.height === 0) return false;
 
+                if (typeof el.focus === 'function') {
+                    try { el.focus(); } catch (e) { }
+                }
+
                 if (typeof el.click === 'function') {
                     el.click();
                 }
 
-                el.dispatchEvent(new MouseEvent('click', {
-                    view: window,
-                    bubbles: true,
-                    cancelable: true
-                }));
+                ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(evtName => {
+                    try {
+                        el.dispatchEvent(new MouseEvent(evtName, {
+                            view: window,
+                            bubbles: true,
+                            cancelable: true,
+                            clientX: rect.left + (rect.width / 2),
+                            clientY: rect.top + (rect.height / 2)
+                        }));
+                    } catch (e) { }
+                });
 
                 clickedElements.add(el);
                 try {
@@ -693,7 +703,43 @@
             }
             return false;
         })();
-        const hasGlobalRecoveryError = hasErrorRecoveryMarkers();
+        // 1.55) Authentic retry button finder (scans all documents, modals, dialogs, and turns)
+        const findAuthenticRetryButton = () => {
+            for (const doc of getDocuments()) {
+                try {
+                    const buttons = Array.from(doc.querySelectorAll('button, [role="button"], a.monaco-button, .monaco-text-button'));
+                    for (const btn of buttons) {
+                        if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') continue;
+
+                        const cls = String(btn.className || '');
+                        if (cls.includes('inline-pill') || cls.includes('tab') || cls.includes('breadcrumb') || cls.includes('monaco-list')) continue;
+
+                        const text = (btn.textContent || btn.innerText || '').trim();
+                        const aria = (btn.getAttribute('aria-label') || '').trim();
+                        const title = (btn.getAttribute('title') || '').trim();
+
+                        const isRetryAction =
+                            /^(retry|try again|thử lại)(\b|$)/i.test(text) ||
+                            /^(retry|try again)(\b|$)/i.test(aria) ||
+                            /^(retry|try again)(\b|$)/i.test(title) ||
+                            /continue generating/i.test(text) ||
+                            /continue generating/i.test(aria);
+
+                        if (!isRetryAction) continue;
+                        if (/\b(cancel|reject|deny|stop|close|hủy|bỏ qua)\b/i.test(text)) continue;
+
+                        const rect = btn.getBoundingClientRect();
+                        if (rect.width > 0 && rect.height > 0) {
+                            return { btn, text: text || aria || title };
+                        }
+                    }
+                } catch (e) { }
+            }
+            return null;
+        };
+
+        const authenticRetry = findAuthenticRetryButton();
+        const hasGlobalRecoveryError = hasErrorRecoveryMarkers() || Boolean(authenticRetry);
         const freeState = window.__autoAcceptFreeState || {};
         const maxRetries = Number(freeState.maxErrorRetries !== undefined ? freeState.maxErrorRetries : 5);
 
@@ -706,8 +752,7 @@
                 freeState.retryWarningSent = false;
                 window.__autoAcceptFreeState = freeState;
             }
-        } else {
-            // 1.55) Automatic recovery after agent error (Retry / Continue Generating)
+        } else if (authenticRetry) {
             if (freeState.errorRetryCount >= maxRetries) {
                 freeState.errorRetryExceeded = true;
                 if (!freeState.retryWarningSent) {
@@ -719,18 +764,14 @@
                 const nowRetry = Date.now();
                 const lastRetryAt = Number(freeState.lastErrorRetryAt || 0);
                 if (nowRetry - lastRetryAt >= 3500) {
-                    for (const btn of allActionButtons) {
-                        const text = getActionText(btn);
-                        const isContinueGenerating = text.includes('continue generating') || /^continue(\b|\s)/i.test(text);
-                        const isRetry = /\b(retry|try again|thử lại)\b/i.test(text) && !/\b(reject|cancel|stop|deny|never)\b/i.test(text);
-
-                        if ((isContinueGenerating || isRetry) && clickElement(btn, 'error-recovery')) {
-                            freeState.lastErrorRetryAt = nowRetry;
-                            freeState.errorRetryCount = (freeState.errorRetryCount || 0) + 1;
-                            window.__autoAcceptFreeState = freeState;
-                            log(`[AutoAccept] Error recovery action clicked: "${text}" (${freeState.errorRetryCount}/${maxRetries})`);
-                            return clickedCount;
-                        }
+                    const btn = authenticRetry.btn;
+                    const actionLabel = authenticRetry.text;
+                    if (clickElement(btn, 'error-recovery')) {
+                        freeState.lastErrorRetryAt = nowRetry;
+                        freeState.errorRetryCount = (freeState.errorRetryCount || 0) + 1;
+                        window.__autoAcceptFreeState = freeState;
+                        log(`[AutoAccept] Error recovery action clicked: "${actionLabel}" (${freeState.errorRetryCount}/${maxRetries})`);
+                        return clickedCount;
                     }
                 }
             }

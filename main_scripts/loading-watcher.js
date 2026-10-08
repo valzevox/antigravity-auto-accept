@@ -265,6 +265,7 @@ class LoadingWatcher {
         let lastResponseText = '';
         let lastError = null;
 
+        let sawSuccessfulTurn = false;
         for (let i = lines.length - 1; i >= 0; i--) {
             try {
                 const record = JSON.parse(lines[i]);
@@ -272,8 +273,12 @@ class LoadingWatcher {
                     lastStepIndex = record.step_index;
                 }
 
-                // Check error or quota failure
-                if (!lastError && (record.type === 'ERROR_MESSAGE' || record.status === 'ERROR' || record.error)) {
+                if (record.type === 'PLANNER_RESPONSE' && (record.status === 'DONE' || !record.status) && (record.content || (record.tool_calls && record.tool_calls.length > 0))) {
+                    sawSuccessfulTurn = true;
+                }
+
+                // Check error or quota failure: only from the most recent tail and not succeeded by a successful turn
+                if (!lastError && !sawSuccessfulTurn && (record.type === 'ERROR_MESSAGE' || record.status === 'ERROR' || record.error)) {
                     const errStr = typeof record.error === 'string' ? record.error : (typeof record.error === 'object' ? JSON.stringify(record.error) : '');
                     const contentStr = typeof record.content === 'string' ? record.content : '';
                     lastError = (errStr || contentStr).trim();
@@ -508,8 +513,21 @@ class LoadingWatcher {
                         try {
                             const retryStatus = await this.router.evalPage(targetId, `(() => {
                                 const st = window.__autoAcceptGetStats ? window.__autoAcceptGetStats() : {};
-                                const hasRetryBtn = !!document.querySelector('button[aria-label*="Retry"], button[title*="Retry"]') ||
-                                    Array.from(document.querySelectorAll('button')).some(b => /\\bretry\\b/i.test(b.textContent || ''));
+                                const hasRetryBtn = Array.from(document.querySelectorAll('button, [role="button"], a.monaco-button')).some(b => {
+                                    if (b.disabled || b.getAttribute('aria-disabled') === 'true') return false;
+                                    const cls = String(b.className || '');
+                                    if (cls.includes('inline-pill') || cls.includes('tab') || cls.includes('breadcrumb') || cls.includes('monaco-list')) return false;
+                                    const t = (b.textContent || b.innerText || '').trim();
+                                    const aria = (b.getAttribute('aria-label') || '').trim();
+                                    const title = (b.getAttribute('title') || '').trim();
+                                    const isRetry = /^(retry|try again|thử lại)(\\b|$)/i.test(t) ||
+                                                    /^(retry|try again)(\\b|$)/i.test(aria) ||
+                                                    /^(retry|try again)(\\b|$)/i.test(title) ||
+                                                    /continue generating/i.test(t);
+                                    if (!isRetry || /\\b(cancel|reject|deny|stop|close|hủy|bỏ qua)\\b/i.test(t)) return false;
+                                    const rect = b.getBoundingClientRect();
+                                    return rect.width > 0 && rect.height > 0;
+                                });
                                 return {
                                     hasRetryBtn,
                                     errorRetryCount: st.errorRetryCount || 0,
