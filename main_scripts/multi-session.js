@@ -78,6 +78,8 @@ class MultiSessionRouter {
         this.quotaAlerted = new Map();
         // Cross-session hop deduplication: sessionId -> { stepId, contentHash, timestamp }
         this.notifiedDone = new Map();
+        // Track the user turn step index that has already received completion notification
+        this.completedUserTurns = new Map();
     }
 
     start() {
@@ -104,6 +106,35 @@ class MultiSessionRouter {
             const lines = buf.toString('utf8').split('\n').filter((l) => l.trim());
             if (!lines.length) return null;
             return JSON.parse(lines[lines.length - 1]);
+        } catch (e) {
+            return null;
+        } finally {
+            if (fd !== undefined) {
+                try { fs.closeSync(fd); } catch (e) {}
+            }
+        }
+    }
+
+    /** Find step_index of the latest USER_INPUT turn in transcript tail. */
+    getLastUserStepIndex(file) {
+        let fd;
+        try {
+            const size = fs.statSync(file).size;
+            if (size === 0) return null;
+            const length = Math.min(size, TAIL_BYTES);
+            const buf = Buffer.alloc(length);
+            fd = fs.openSync(file, 'r');
+            fs.readSync(fd, buf, 0, length, size - length);
+            const lines = buf.toString('utf8').split('\n').filter((l) => l.trim());
+            for (let i = lines.length - 1; i >= 0; i--) {
+                try {
+                    const rec = JSON.parse(lines[i]);
+                    if (rec && (rec.type === 'USER_INPUT' || rec.source === 'USER_EXPLICIT')) {
+                        return rec.step_index !== undefined ? rec.step_index : (rec.created_at || null);
+                    }
+                } catch (err) {}
+            }
+            return null;
         } catch (e) {
             return null;
         } finally {
@@ -230,19 +261,23 @@ class MultiSessionRouter {
             if (!Array.isArray(last.tool_calls) || last.tool_calls.length === 0) {
                 const doneContent = (last.content || '').trim();
                 const doneHash = hashContent(doneContent);
+                const lastUserStep = this.getLastUserStepIndex(file);
 
                 // Hopping between sessions re-touches the transcript file.
-                // Dedup permanently on (stepId || contentHash), so returning to an already
+                // Dedup permanently on (lastUserStep || stepId || contentHash), so returning to an already
                 // completed turn never re-fires completion notifications or ends loading cards again.
                 const prior = this.notifiedDone.get(id);
-                const isRepeat = prior && (
+                const isRepeat = (prior && (
                     (prior.contentHash === doneHash) ||
                     (prior.stepId === stepId)
-                );
+                )) || (lastUserStep !== null && this.completedUserTurns.get(id) === lastUserStep);
 
                 if (!this.seenSteps.has(key) && !isRepeat) {
                     this.seenSteps.set(key, now);
                     this.notifiedDone.set(id, { stepId, contentHash: doneHash, timestamp: now });
+                    if (lastUserStep !== null) {
+                        this.completedUserTurns.set(id, lastUserStep);
+                    }
                     let content = doneContent;
                     if (!content) {
                         content = 'Agent hoàn tất lượt công việc (Không còn yêu cầu công cụ nào khác).';
@@ -652,68 +687,102 @@ class MultiSessionRouter {
         const targetId = this._getTargetId();
         if (!targetId) return null;
 
-        const expr = `(() => {
+        const expr = `(async () => {
             const pathname = window.location.pathname;
             const curSession = pathname.replace('/c/', '').split('?')[0];
             if (curSession !== ${JSON.stringify(sessionId)}) return null;
 
-            // 1. Locate conversation elements
-            const turn = document.querySelector('.flex.flex-col.gap-0\\\\.5.group.w-full');
-            const row = turn ? (turn.closest('.relative.flex.flex-col.gap-y-3') || turn) : null;
+            // 1. Find the latest assistant response turn
+            const allTurns = Array.from(document.querySelectorAll('.flex.flex-col.gap-0\\\\.5.group.w-full, [class*="prose"], .markdown'));
+            const lastTurn = allTurns.pop();
+            const turnContainer = lastTurn ? (lastTurn.closest('.relative.flex.flex-col.gap-y-3') || lastTurn.closest('.group\\\\/message') || lastTurn.closest('div[class*="message"]') || lastTurn) : null;
 
-            // 2. Scroll down until bottom / files changed pill is reached
-            const filesChanged = document.querySelector('.files-changed-header, [class*="files-changed"]') ||
-                Array.from(document.querySelectorAll('*')).find(el => /\\d+\\s+files?\\s+changed/i.test(el.textContent || '') && el.children.length < 4);
+            // 2. Scroll chat containers all the way to bottom
+            const scrollContainers = Array.from(document.querySelectorAll('.overflow-y-auto, [class*="chat"], main'));
+            for (const sc of scrollContainers) {
+                try {
+                    if (sc.scrollHeight > sc.clientHeight) {
+                        sc.scrollTop = sc.scrollHeight;
+                    }
+                } catch (e) {}
+            }
 
+            // 3. Locate files changed pill / button or action bar of this turn
+            const findFilesChanged = () => {
+                return document.querySelector('.files-changed-header, [class*="files-changed"]') ||
+                    Array.from(document.querySelectorAll('*')).find(el => /\\d+\\s+files?\\s+changed/i.test(el.textContent || '') && el.children.length < 4);
+            };
+
+            let filesChanged = findFilesChanged();
             if (filesChanged) {
                 try {
                     filesChanged.scrollIntoView({ block: 'end', behavior: 'instant' });
                 } catch (e) {}
-            } else {
-                // Scroll container to bottom
-                const scrollEl = document.querySelector('.overflow-y-auto');
-                if (scrollEl) {
-                    try { scrollEl.scrollTop = scrollEl.scrollHeight; } catch (e) {}
-                }
+            } else if (turnContainer) {
+                try {
+                    turnContainer.scrollIntoView({ block: 'end', behavior: 'instant' });
+                } catch (e) {}
             }
 
-            // 3. Locate full chat pane including top title header
+            // 4. Wait for layout settle and render repaint
+            await new Promise((resolve) => setTimeout(resolve, 350));
+
+            // Re-check files changed after wait/scroll
+            filesChanged = findFilesChanged();
+            if (filesChanged) {
+                try {
+                    filesChanged.scrollIntoView({ block: 'end', behavior: 'instant' });
+                } catch (e) {}
+            }
+
+            // 5. Locate pane & header
             const pane = document.querySelector('.group\\\\/pane') || document.querySelector('.border-border') || document.querySelector('.overflow-y-auto');
             if (!pane) return null;
 
-            let paneWithHeader = pane;
-            while (paneWithHeader && paneWithHeader !== document.body) {
-                const text = (paneWithHeader.innerText || '');
-                if (text.includes(document.title.split(' - ')[0].trim()) || paneWithHeader.querySelector('header')) {
-                    break;
-                }
-                if (paneWithHeader.parentElement && paneWithHeader.parentElement.clientWidth === paneWithHeader.clientWidth) {
-                    paneWithHeader = paneWithHeader.parentElement;
-                } else {
-                    break;
-                }
+            // Find header bar of session if available
+            const sessionHeader = document.querySelector('header') ||
+                Array.from(document.querySelectorAll('div, nav')).find(el => el.clientHeight > 20 && el.clientHeight < 80 && el.textContent.includes(document.title.split(' - ')[0].trim()));
+
+            const paneRect = pane.getBoundingClientRect();
+            const turnRect = turnContainer ? turnContainer.getBoundingClientRect() : null;
+            const headerRect = sessionHeader ? sessionHeader.getBoundingClientRect() : null;
+
+            // Top boundary: include header if it's visible, otherwise start at turn top
+            let topY = paneRect.y;
+            if (headerRect && headerRect.top >= 0 && headerRect.bottom > 0) {
+                topY = headerRect.top;
+            } else if (turnRect && turnRect.top > paneRect.y) {
+                topY = Math.max(0, turnRect.top - 12);
             }
 
-            const r = (paneWithHeader || pane).getBoundingClientRect();
-
-            // 4. Crop height directly under the action buttons / files changed pill
-            let bottomY = r.bottom;
+            // Bottom boundary: under files changed pill or action bar (Copy button / icons)
+            let bottomY = paneRect.bottom;
             if (filesChanged) {
                 const fcRect = filesChanged.getBoundingClientRect();
                 const actionBar = filesChanged.parentElement?.parentElement?.querySelector('button[aria-label*="Copy"], button[title*="Copy"], button svg[class*="lucide-copy"]')?.closest('div');
                 if (actionBar) {
-                    bottomY = actionBar.getBoundingClientRect().bottom + 10;
+                    bottomY = actionBar.getBoundingClientRect().bottom + 12;
                 } else {
                     bottomY = fcRect.bottom + 45;
                 }
+            } else {
+                const copyBtn = Array.from(document.querySelectorAll('button[aria-label*="Copy"], button[title*="Copy"], button svg[class*="lucide-copy"]')).pop();
+                if (copyBtn) {
+                    const cbRect = copyBtn.getBoundingClientRect();
+                    bottomY = cbRect.bottom + 16;
+                } else if (turnRect) {
+                    bottomY = turnRect.bottom + 16;
+                }
             }
 
-            const finalHeight = Math.min(r.height, Math.max(180, Math.ceil(bottomY - r.y)));
+            const clampedBottom = Math.min(window.innerHeight, Math.ceil(bottomY));
+            const clampedTop = Math.max(0, Math.floor(topY));
+            const finalHeight = Math.max(120, clampedBottom - clampedTop);
 
             return {
-                x: Math.max(0, Math.floor(r.x)),
-                y: Math.max(0, Math.floor(r.y)),
-                width: Math.ceil(r.width),
+                x: Math.max(0, Math.floor(paneRect.x)),
+                y: clampedTop,
+                width: Math.ceil(paneRect.width),
                 height: finalHeight,
                 scale: 1
             };
