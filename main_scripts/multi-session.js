@@ -630,9 +630,12 @@ class MultiSessionRouter {
     }
 
     /**
-     * Target connection ID helper
+     * Target connection ID helper — pick active page target
      */
     _getTargetId() {
+        for (const [id, conn] of this.handler.connections) {
+            if (conn.targetInfo?.type === 'page') return id;
+        }
         for (const [id] of this.handler.connections) {
             return id;
         }

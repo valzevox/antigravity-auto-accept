@@ -585,6 +585,11 @@ class CDPHandler {
                 return null;
             }
 
+            // Ensure Page domain is enabled for target/session
+            try {
+                await this._send(targetId, 'Page.enable', {}, sessionId);
+            } catch (e) {}
+
             const safeClip = {
                 x: Math.max(0, Math.floor(clip.x)),
                 y: Math.max(0, Math.floor(clip.y)),
@@ -599,10 +604,13 @@ class CDPHandler {
             }, sessionId);
 
             if (screenshotRes?.data) {
-                return Buffer.from(screenshotRes.data, 'base64');
+                const buf = Buffer.from(screenshotRes.data, 'base64');
+                this.log(`[CDP] Captured element screenshot (${buf.length} bytes, clip: ${safeClip.width}x${safeClip.height})`);
+                return buf;
             }
             return null;
         } catch (e) {
+            this.log(`[CDP] captureElementScreenshot failed: ${e.message}`);
             return null;
         }
     }
