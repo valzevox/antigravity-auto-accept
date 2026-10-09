@@ -692,97 +692,76 @@ class MultiSessionRouter {
             const curSession = pathname.replace('/c/', '').split('?')[0];
             if (curSession !== ${JSON.stringify(sessionId)}) return null;
 
-            // 1. Find the latest assistant response turn
-            const allTurns = Array.from(document.querySelectorAll('.flex.flex-col.gap-0\\\\.5.group.w-full, [class*="prose"], .markdown'));
-            const lastTurn = allTurns.pop();
-            const turnContainer = lastTurn ? (lastTurn.closest('.relative.flex.flex-col.gap-y-3') || lastTurn.closest('.group\\\\/message') || lastTurn.closest('div[class*="message"]') || lastTurn) : null;
+            // 1. Locate main chat scroll container by checking actual scrollable height
+            const allScrollables = Array.from(document.querySelectorAll('*')).filter(el => {
+                const s = window.getComputedStyle(el);
+                const hasScroll = s.overflowY === 'auto' || s.overflowY === 'scroll';
+                return hasScroll && el.scrollHeight > el.clientHeight + 50;
+            });
 
-            // 2. Scroll chat containers all the way to bottom
-            const scrollContainers = Array.from(document.querySelectorAll('.overflow-y-auto, [class*="chat"], main'));
-            for (const sc of scrollContainers) {
+            // Scroll every scrollable chat element to bottom
+            for (const sc of allScrollables) {
                 try {
-                    if (sc.scrollHeight > sc.clientHeight) {
-                        sc.scrollTop = sc.scrollHeight;
-                    }
+                    sc.scrollTop = sc.scrollHeight + 10000;
                 } catch (e) {}
             }
 
-            // 3. Locate files changed pill / button or action bar of this turn
+            // 2. Locate files changed pill / bottom elements
             const findFilesChanged = () => {
                 return document.querySelector('.files-changed-header, [class*="files-changed"]') ||
                     Array.from(document.querySelectorAll('*')).find(el => /\\d+\\s+files?\\s+changed/i.test(el.textContent || '') && el.children.length < 4);
             };
 
-            let filesChanged = findFilesChanged();
-            if (filesChanged) {
-                try {
-                    filesChanged.scrollIntoView({ block: 'end', behavior: 'instant' });
-                } catch (e) {}
-            } else if (turnContainer) {
-                try {
-                    turnContainer.scrollIntoView({ block: 'end', behavior: 'instant' });
-                } catch (e) {}
-            }
-
-            // 4. Wait for layout settle and render repaint
-            await new Promise((resolve) => setTimeout(resolve, 350));
-
-            // Re-check files changed after wait/scroll
-            filesChanged = findFilesChanged();
+            const filesChanged = findFilesChanged();
             if (filesChanged) {
                 try {
                     filesChanged.scrollIntoView({ block: 'end', behavior: 'instant' });
                 } catch (e) {}
             }
 
-            // 5. Locate pane & header
-            const pane = document.querySelector('.group\\\\/pane') || document.querySelector('.border-border') || document.querySelector('.overflow-y-auto');
-            if (!pane) return null;
+            // 3. Wait for layout settle and render repaint
+            await new Promise((resolve) => setTimeout(resolve, 400));
 
-            // Find header bar of session if available
-            const sessionHeader = document.querySelector('header') ||
-                Array.from(document.querySelectorAll('div, nav')).find(el => el.clientHeight > 20 && el.clientHeight < 80 && el.textContent.includes(document.title.split(' - ')[0].trim()));
+            // Scroll once again to ensure bottom position
+            for (const sc of allScrollables) {
+                try {
+                    sc.scrollTop = sc.scrollHeight + 10000;
+                } catch (e) {}
+            }
 
+            // 4. Locate full chat pane
+            const pane = document.querySelector('.group\\\\/pane') || document.querySelector('.border-border') || document.querySelector('.overflow-y-auto') || document.body;
             const paneRect = pane.getBoundingClientRect();
-            const turnRect = turnContainer ? turnContainer.getBoundingClientRect() : null;
+
+            // Find top header
+            const sessionHeader = document.querySelector('header') ||
+                Array.from(document.querySelectorAll('div, nav')).find(el => el.clientHeight >= 24 && el.clientHeight <= 80 && el.textContent.includes(document.title.split(' - ')[0].trim()));
             const headerRect = sessionHeader ? sessionHeader.getBoundingClientRect() : null;
 
-            // Top boundary: include header if it's visible, otherwise start at turn top
-            let topY = paneRect.y;
-            if (headerRect && headerRect.top >= 0 && headerRect.bottom > 0) {
-                topY = headerRect.top;
-            } else if (turnRect && turnRect.top > paneRect.y) {
-                topY = Math.max(0, turnRect.top - 12);
+            // Find bottom input box / action area to bound the bottom
+            const inputBox = document.querySelector('textarea, [contenteditable="true"]') ||
+                document.querySelector('input[type="text"]') ||
+                document.querySelector('.files-changed-header, [class*="files-changed"]');
+            const inputRect = inputBox ? inputBox.getBoundingClientRect() : null;
+
+            const topY = headerRect && headerRect.top >= 0 && headerRect.top < window.innerHeight / 2
+                ? Math.max(0, Math.floor(headerRect.top))
+                : Math.max(0, Math.floor(paneRect.y));
+
+            // Clip bottom: up to below input bar or bottom of viewport
+            let bottomY = window.innerHeight;
+            if (inputRect && inputRect.bottom > topY && inputRect.bottom <= window.innerHeight + 20) {
+                bottomY = Math.min(window.innerHeight, inputRect.bottom + 10);
+            } else if (paneRect.bottom > topY) {
+                bottomY = Math.min(window.innerHeight, paneRect.bottom);
             }
 
-            // Bottom boundary: under files changed pill or action bar (Copy button / icons)
-            let bottomY = paneRect.bottom;
-            if (filesChanged) {
-                const fcRect = filesChanged.getBoundingClientRect();
-                const actionBar = filesChanged.parentElement?.parentElement?.querySelector('button[aria-label*="Copy"], button[title*="Copy"], button svg[class*="lucide-copy"]')?.closest('div');
-                if (actionBar) {
-                    bottomY = actionBar.getBoundingClientRect().bottom + 12;
-                } else {
-                    bottomY = fcRect.bottom + 45;
-                }
-            } else {
-                const copyBtn = Array.from(document.querySelectorAll('button[aria-label*="Copy"], button[title*="Copy"], button svg[class*="lucide-copy"]')).pop();
-                if (copyBtn) {
-                    const cbRect = copyBtn.getBoundingClientRect();
-                    bottomY = cbRect.bottom + 16;
-                } else if (turnRect) {
-                    bottomY = turnRect.bottom + 16;
-                }
-            }
-
-            const clampedBottom = Math.min(window.innerHeight, Math.ceil(bottomY));
-            const clampedTop = Math.max(0, Math.floor(topY));
-            const finalHeight = Math.max(120, clampedBottom - clampedTop);
+            const finalHeight = Math.max(200, Math.ceil(bottomY - topY));
 
             return {
                 x: Math.max(0, Math.floor(paneRect.x)),
-                y: clampedTop,
-                width: Math.ceil(paneRect.width),
+                y: topY,
+                width: Math.ceil(paneRect.width || window.innerWidth),
                 height: finalHeight,
                 scale: 1
             };
