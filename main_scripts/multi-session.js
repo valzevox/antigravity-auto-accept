@@ -657,45 +657,66 @@ class MultiSessionRouter {
             const curSession = pathname.replace('/c/', '').split('?')[0];
             if (curSession !== ${JSON.stringify(sessionId)}) return null;
 
-            // Locate conversation turns in Antigravity chat
-            const turns = Array.from(document.querySelectorAll('.flex.flex-col.gap-0\\\\.5.group.w-full'));
-            if (!turns.length) return null;
+            // 1. Locate conversation elements
+            const turn = document.querySelector('.flex.flex-col.gap-0\\\\.5.group.w-full');
+            const row = turn ? (turn.closest('.relative.flex.flex-col.gap-y-3') || turn) : null;
 
-            // Pick the last completed turn
-            for (let i = turns.length - 1; i >= 0; i--) {
-                const turn = turns[i];
-                // Check if turn contains assistant response
-                let target = turn.querySelector('.leading-relaxed.select-text.text-sm');
-                if (!target) {
-                    target = turn.querySelector('div[class*="markdown"], div[class*="prose"]');
-                }
-                if (!target) {
-                    // Fallback to turn container itself excluding user sticky header if present
-                    const sticky = turn.querySelector('.sticky.top-0');
-                    if (sticky && sticky.nextElementSibling) {
-                        target = sticky.nextElementSibling;
-                    } else {
-                        target = turn;
-                    }
-                }
+            // 2. Scroll down until bottom / files changed pill is reached
+            const filesChanged = document.querySelector('.files-changed-header, [class*="files-changed"]') ||
+                Array.from(document.querySelectorAll('*')).find(el => /\\d+\\s+files?\\s+changed/i.test(el.textContent || '') && el.children.length < 4);
 
-                if (target) {
-                    try {
-                        target.scrollIntoView({ block: 'nearest', behavior: 'instant' });
-                    } catch (e) {}
-                    const r = target.getBoundingClientRect();
-                    if (r.width > 20 && r.height > 20) {
-                        return {
-                            x: Math.max(0, Math.floor(r.x)),
-                            y: Math.max(0, Math.floor(r.y)),
-                            width: Math.ceil(r.width),
-                            height: Math.ceil(r.height),
-                            scale: 1
-                        };
-                    }
+            if (filesChanged) {
+                try {
+                    filesChanged.scrollIntoView({ block: 'end', behavior: 'instant' });
+                } catch (e) {}
+            } else {
+                // Scroll container to bottom
+                const scrollEl = document.querySelector('.overflow-y-auto');
+                if (scrollEl) {
+                    try { scrollEl.scrollTop = scrollEl.scrollHeight; } catch (e) {}
                 }
             }
-            return null;
+
+            // 3. Locate full chat pane including top title header
+            const pane = document.querySelector('.group\\\\/pane') || document.querySelector('.border-border') || document.querySelector('.overflow-y-auto');
+            if (!pane) return null;
+
+            let paneWithHeader = pane;
+            while (paneWithHeader && paneWithHeader !== document.body) {
+                const text = (paneWithHeader.innerText || '');
+                if (text.includes(document.title.split(' - ')[0].trim()) || paneWithHeader.querySelector('header')) {
+                    break;
+                }
+                if (paneWithHeader.parentElement && paneWithHeader.parentElement.clientWidth === paneWithHeader.clientWidth) {
+                    paneWithHeader = paneWithHeader.parentElement;
+                } else {
+                    break;
+                }
+            }
+
+            const r = (paneWithHeader || pane).getBoundingClientRect();
+
+            // 4. Crop height directly under the action buttons / files changed pill
+            let bottomY = r.bottom;
+            if (filesChanged) {
+                const fcRect = filesChanged.getBoundingClientRect();
+                const actionBar = filesChanged.parentElement?.parentElement?.querySelector('button[aria-label*="Copy"], button[title*="Copy"], button svg[class*="lucide-copy"]')?.closest('div');
+                if (actionBar) {
+                    bottomY = actionBar.getBoundingClientRect().bottom + 10;
+                } else {
+                    bottomY = fcRect.bottom + 45;
+                }
+            }
+
+            const finalHeight = Math.min(r.height, Math.max(180, Math.ceil(bottomY - r.y)));
+
+            return {
+                x: Math.max(0, Math.floor(r.x)),
+                y: Math.max(0, Math.floor(r.y)),
+                width: Math.ceil(r.width),
+                height: finalHeight,
+                scale: 1
+            };
         })()`;
 
         return this.handler.captureElementScreenshot(targetId, expr);
