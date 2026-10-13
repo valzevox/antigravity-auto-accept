@@ -229,34 +229,11 @@ class DiscordGatewayBridge {
             }
         });
 
-        // Hop and execute in Antigravity page
-        const expr = `(async () => {
-            try {
-                if (window.__TSR_ROUTER__) {
-                    await window.__TSR_ROUTER__.navigate({ to: '/c/${sessionId}' });
-                }
-                await new Promise((r) => setTimeout(r, 600));
-
-                const radios = Array.from(document.querySelectorAll('[role="radio"], [role="option"], input[type="radio"], label'));
-                if (radios[${index}]) {
-                    radios[${index}].click();
-                }
-
-                await new Promise((r) => setTimeout(r, 200));
-
-                const submit = Array.from(document.querySelectorAll('button, [role="button"]'))
-                    .find((b) => (b.textContent || '').trim().toLowerCase() === 'submit');
-                if (submit) submit.click();
-
-                return true;
-            } catch (e) {
-                return false;
-            }
-        })()`;
-
-        for (const [targetId] of this.router.handler.connections) {
-            await this.router.handler._evaluate(targetId, expr);
-            break;
+        // Delegate to router for robust radio selection and submit button handling
+        try {
+            await this.router.answerQuestion(sessionId, index);
+        } catch (e) {
+            this.log(`[DiscordGateway] answerQuestion failed: ${e.message}`);
         }
     }
 

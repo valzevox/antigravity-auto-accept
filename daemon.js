@@ -49,6 +49,30 @@ function checkCdpPort(port) {
     });
 }
 
+async function resolveActiveCdpPort() {
+    // 1. Check DevToolsActivePort file written by Electron/Antigravity
+    try {
+        const dtPath = path.join(process.env.APPDATA || '', 'Antigravity', 'DevToolsActivePort');
+        if (fs.existsSync(dtPath)) {
+            const firstLine = fs.readFileSync(dtPath, 'utf8').split('\n')[0].trim();
+            const p = parseInt(firstLine, 10);
+            if (p > 0 && p < 65536) {
+                if (await checkCdpPort(p)) return p;
+            }
+        }
+    } catch (e) {}
+
+    // 2. Check default port 9000
+    if (await checkCdpPort(PORT)) return PORT;
+
+    // 3. Check port range 9001-9005
+    for (let p = 9001; p <= 9005; p++) {
+        if (await checkCdpPort(p)) return p;
+    }
+
+    return null;
+}
+
 const { MultiSessionRouter } = require('./main_scripts/multi-session');
 const { TelegramAnswerBridge } = require('./main_scripts/telegram-bridge');
 const { DiscordGatewayBridge } = require('./main_scripts/discord-gateway');
@@ -79,10 +103,10 @@ if (bridge) {
 
 async function loop() {
     try {
-        const available = await checkCdpPort(PORT);
-        if (available) {
+        const activePort = await resolveActiveCdpPort();
+        if (activePort) {
             await handler.start({
-                cdpPort: PORT,
+                cdpPort: activePort,
                 cdpPortRange: 0,
                 isBackgroundMode: true,
                 ide: 'antigravity',
@@ -90,7 +114,7 @@ async function loop() {
                 maxErrorRetries: router.notifier?.config?.maxErrorRetries !== undefined ? router.notifier.config.maxErrorRetries : 5
             });
             if (!isConnected) {
-                log('[AutoAccept Daemon] Successfully connected to Antigravity 2.0 via CDP!');
+                log(`[AutoAccept Daemon] Successfully connected to Antigravity 2.0 via CDP on port ${activePort}!`);
                 isConnected = true;
                 router.start();
                 loadingWatcher.start();

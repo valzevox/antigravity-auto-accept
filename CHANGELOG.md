@@ -2,7 +2,14 @@
 
 All notable changes to the **Antigravity Auto Accept** extension are documented here.
 
-## [2.1.0] - 2026-10-08
+## [2.3.2] - 2026-10-13
+
+### Added
+- **Unified `answerQuestion` Handler**: Built centralized answering pipeline in `MultiSessionRouter` used by both Discord and Telegram bridges.
+- **Dynamic CDP Port Discovery**: Automatic detection of active ports via `DevToolsActivePort` with fallback range (9000-9005).
+
+### Fixed
+- **Option & Submit Button Execution**: Fixed Submit button detection failing on trailing symbols (`Submit ↵`). Dispatches full Pointer/Mouse events and native CDP `Enter` key.
 
 ### Added
 - **1-Click PowerShell Installer (`install.ps1`)**: Modeled after Free Claude Code (FCC) for zero-friction setup via a single command line (`irm ... | iex`).

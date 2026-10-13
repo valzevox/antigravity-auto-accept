@@ -524,6 +524,93 @@ class MultiSessionRouter {
     }
 
     /**
+     * Select option index and click Submit for an interactive question / approval prompt
+     */
+    async answerQuestion(sessionId, index) {
+        let targetId = null;
+        for (const [id] of this.handler.connections) {
+            targetId = id;
+            break;
+        }
+        if (!targetId) return { ok: false, error: 'Antigravity CDP chưa kết nối' };
+
+        const expr = `(async () => {
+            try {
+                if (window.__TSR_ROUTER__) {
+                    await window.__TSR_ROUTER__.navigate({ to: '/c/' + ${JSON.stringify(sessionId)} });
+                }
+                await new Promise((r) => setTimeout(r, 600));
+
+                // 1. Locate question container / dialog / card
+                const questionContainer = document.querySelector('[role="dialog"], [class*="modal"]') ||
+                    document.querySelector('[data-testid*="ask_question"]') ||
+                    Array.from(document.querySelectorAll('div')).reverse().find(d => {
+                        const t = (d.textContent || '').toLowerCase();
+                        return (t.includes('submit') || t.includes('skip')) && (t.includes('1') || t.includes('recommended') || t.includes('yes, allow'));
+                    }) || document.body;
+
+                // 2. Locate radio options (role=radio, role=option, input[type=radio])
+                let radios = Array.from(questionContainer.querySelectorAll('[role="radio"], [role="option"], input[type="radio"]'));
+
+                // Fallback to row/button options or list items if no explicit role="radio"
+                if (!radios.length) {
+                    radios = Array.from(questionContainer.querySelectorAll('button, [role="button"], div[tabindex], label')).filter(el => {
+                        const t = (el.textContent || '').trim().toLowerCase();
+                        return !t.startsWith('submit') && !t.startsWith('skip') && !t.startsWith('cancel');
+                    });
+                }
+
+                const targetRadio = radios[${index}];
+                if (targetRadio) {
+                    targetRadio.focus?.();
+                    targetRadio.click?.();
+                    ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(evt => {
+                        try {
+                            targetRadio.dispatchEvent(new MouseEvent(evt, { bubbles: true, cancelable: true, view: window }));
+                        } catch (e) {}
+                    });
+                }
+
+                await new Promise((r) => setTimeout(r, 300));
+
+                // 3. Find and click Submit button (supports "Submit ↵", "Submit", "Gửi", etc.)
+                const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
+                const submitBtn = buttons.find(b => {
+                    if (b.disabled || b.getAttribute('aria-disabled') === 'true') return false;
+                    const txt = (b.textContent || '').replace(/\\s+/g, ' ').trim().toLowerCase();
+                    const aria = (b.getAttribute('aria-label') || '').trim().toLowerCase();
+                    return txt.startsWith('submit') || txt.includes('submit') || aria.startsWith('submit') || txt.startsWith('gửi');
+                });
+
+                if (submitBtn) {
+                    submitBtn.focus?.();
+                    submitBtn.click?.();
+                    ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(evt => {
+                        try {
+                            submitBtn.dispatchEvent(new MouseEvent(evt, { bubbles: true, cancelable: true, view: window }));
+                        } catch (e) {}
+                    });
+                    return { ok: true, method: 'submit-click' };
+                }
+
+                return { ok: true, method: 'radio-selected' };
+            } catch (e) {
+                return { ok: false, error: e.message };
+            }
+        })()`;
+
+        const res = await this.evalPage(targetId, expr);
+
+        // Guarantee submission: native CDP Enter key (Antigravity's Submit button binds Enter / ↵)
+        try {
+            await sleep(200);
+            await this.handler._pressKey(targetId, 'Enter');
+        } catch (e) {}
+
+        return res || { ok: true };
+    }
+
+    /**
      * Dispatch a user prompt into Antigravity input field and send it using native CDP events
      */
     async sendPrompt(text, newSession = false) {
