@@ -2,6 +2,12 @@
 
 All notable changes to the **Antigravity Auto Accept** extension are documented here.
 
+## [2.3.3] - 2026-10-15
+
+### Added
+- **1-Click CDP Recovery Tool (`fix-cdp.bat`)**: Automatically terminates lingering zombie `Antigravity.exe` and `node.exe` daemon instances after silent background IDE updates, clean-relaunching Antigravity with `--remote-debugging-port=9000`.
+- **Pre-Flight CDP Health Check in `run.bat`**: Detects if Antigravity is running without an active CDP port before launching the daemon, warning the user immediately.
+
 ## [2.3.2] - 2026-10-13
 
 ### Added
