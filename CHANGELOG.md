@@ -2,6 +2,20 @@
 
 All notable changes to the **Antigravity Auto Accept** extension are documented here.
 
+## [2.4.0] - 2026-10-17
+
+### Added
+- **Multi-Platform Support (Antigravity CLI & IDE)**:
+  - Automatic detection and configuration of Antigravity CLI (`agy`) during install.
+  - Automatically generates `agy-auto` CLI wrapper (powered by `--dangerously-skip-permissions`) placed in user PATH for zero-prompt terminal workflows.
+  - Enables permissive default configuration in `~/.gemini/antigravity-cli/settings.json`.
+  - Configures Antigravity IDE and VS Code compatibility.
+- **Enhanced 1-Click Bilingual Installer (`install.ps1`)**:
+  - Full English and Vietnamese interactive onboarding options.
+  - Automatic desktop shortcut generator if none exists.
+  - In-place detection of running Antigravity processes with automated CDP restart option.
+  - Live Discord bot verification test sending a confirmation message upon setup.
+
 ## [2.3.3] - 2026-10-15
 
 ### Added
