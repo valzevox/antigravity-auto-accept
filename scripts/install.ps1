@@ -554,8 +554,23 @@ if ($dToken -and $dChan) {
     }
 }
 
-# 7. Register Windows Scheduled Task for Startup
+# 7. Register Windows Startup Scheduled Task & Startup Folder .vbs (like 9Router/9Remote)
 Write-Step $t.RegisterTask
+
+# A. Create Startup Folder .vbs for seamless silent launch (100% like 9router/9remote)
+$startupFolder = [Environment]::GetFolderPath('Startup')
+if (Test-Path $startupFolder) {
+    try {
+        $nodeExePath = (Get-Command node).Source
+        $daemonJsPath = Join-Path $RepoDir "daemon.js"
+        $vbsPath = Join-Path $startupFolder "AntigravityAutoAccept.vbs"
+        $vbsContent = "Set WshShell = CreateObject(`"WScript.Shell`")`r`nWshShell.Run `"`"`"$nodeExePath`"`" `"`"$daemonJsPath`"`" --tray`", 0, False"
+        [IO.File]::WriteAllText($vbsPath, $vbsContent, (New-Object Text.ASCIIEncoding))
+        Write-Success "Created Windows Startup VBS: $vbsPath"
+    } catch {
+        Write-Warn "Could not write to Startup folder: $($_.Exception.Message)"
+    }
+}
 
 $taskName = "AntigravityAutoAccept"
 $bootCommand = "cmd.exe"

@@ -77,9 +77,77 @@ const { MultiSessionRouter } = require('./main_scripts/multi-session');
 const { TelegramAnswerBridge } = require('./main_scripts/telegram-bridge');
 const { DiscordGatewayBridge } = require('./main_scripts/discord-gateway');
 const { LoadingWatcher } = require('./main_scripts/loading-watcher');
+const { initTray } = require('./main_scripts/tray');
+const { checkGitUpdate } = require('./main_scripts/auto-updater');
+const { spawn } = require('child_process');
+
+// Periodic & Startup Auto-Update check
+function performAutoUpdateCheck() {
+    try {
+        const updated = checkGitUpdate(log);
+        if (updated) {
+            log('[AutoAccept Daemon] Self-restarting after update...');
+            if (trayController) {
+                try { trayController.kill(); } catch (e) {}
+            }
+            const runBat = path.join(__dirname, 'run.bat');
+            spawn('cmd.exe', ['/c', runBat, '--background'], {
+                detached: true,
+                stdio: 'ignore',
+                windowsHide: true
+            }).unref();
+            process.exit(0);
+        }
+    } catch (e) {}
+}
+
+// Check update on launch, and check every 30 minutes
+performAutoUpdateCheck();
+setInterval(performAutoUpdateCheck, 30 * 60 * 1000);
+
 const router = new MultiSessionRouter(handler, { log });
 const loadingWatcher = new LoadingWatcher(router, { log });
 router.loadingWatcher = loadingWatcher;
+
+// Initialize System Tray Icon for Windows Taskbar
+let trayController = null;
+try {
+    const iconPath = path.join(__dirname, 'media', 'icon.ico');
+    trayController = initTray({
+        iconPath,
+        tooltip: 'Antigravity Auto Accept (Running)',
+        items: [
+            { title: 'Antigravity Auto Accept v2.4.0', enabled: false },
+            { title: 'Status: Initializing...', enabled: false },
+            { title: '-', enabled: false },
+            { title: 'Fix / Restart Antigravity CDP', enabled: true },
+            { title: 'Check Updates Now', enabled: true },
+            { title: 'Open Logs', enabled: true },
+            { title: '-', enabled: false },
+            { title: 'Quit / Exit', enabled: true }
+        ],
+        onClick: (index) => {
+            if (index === 3) {
+                // Fix / Restart Antigravity CDP
+                const fixBat = path.join(__dirname, 'fix-cdp.bat');
+                spawn('cmd.exe', ['/c', fixBat], { detached: true, stdio: 'ignore' }).unref();
+            } else if (index === 4) {
+                // Check updates now
+                performAutoUpdateCheck();
+            } else if (index === 5) {
+                // Open logs
+                spawn('notepad.exe', [logFile], { detached: true, stdio: 'ignore' }).unref();
+            } else if (index === 7) {
+                // Quit
+                log('[AutoAccept Daemon] User exited via Tray Icon.');
+                if (trayController) trayController.kill();
+                process.exit(0);
+            }
+        }
+    });
+} catch (e) {
+    log(`[Tray] Tray initialization warning: ${e.message}`);
+}
 
 let bridge = null;
 const tgToken = router.notifier.config.webhooks.telegram.botToken;
@@ -118,6 +186,10 @@ async function loop() {
                 isConnected = true;
                 router.start();
                 loadingWatcher.start();
+                if (trayController) {
+                    trayController.updateItem(1, `Status: Connected (Port ${activePort})`, false);
+                    trayController.setTooltip(`Antigravity Auto Accept: Connected (Port ${activePort})`);
+                }
             }
         } else {
             if (isConnected) {
@@ -126,6 +198,10 @@ async function loop() {
                 router.stop();
                 loadingWatcher.stop();
                 await handler.stop();
+                if (trayController) {
+                    trayController.updateItem(1, 'Status: Disconnected (Waiting for App)', false);
+                    trayController.setTooltip('Antigravity Auto Accept: Disconnected');
+                }
             }
         }
     } catch (err) {

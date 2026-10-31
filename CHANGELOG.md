@@ -2,6 +2,17 @@
 
 All notable changes to the **Antigravity Auto Accept** extension are documented here.
 
+## [2.5.0] - 2026-10-31
+
+### Added
+- **Windows System Tray Icon**:
+  - Hidden taskbar tray icon with context menu (Status, Fix CDP, Check Updates, Open Logs, Quit).
+  - Pure PowerShell & WinForms implementation, zero binary dependencies, AV-safe.
+- **Silent Background Startup (.vbs)**:
+  - Adopted 9Router/9Remote architecture: registers AntigravityAutoAccept.vbs directly into Windows Startup folder for 100% silent launch on boot without console flicker.
+- **Automatic In-Process Updates**:
+  - Automatically queries GitHub for upstream updates on launch and every 30 minutes in the background.
+  - Seamlessly pulls new commits, updates dependencies, and auto-restarts daemon without requiring user interaction.
 ## [2.4.0] - 2026-10-17
 
 ### Added
